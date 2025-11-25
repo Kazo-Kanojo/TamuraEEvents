@@ -2,19 +2,18 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./components/Home";
 import Login from "./components/Login";
 import UserDashboard from "./components/UserDashboard";
+import About from "./components/About";
+import Contact from "./components/Contact"; // <--- 1. VERIFIQUE SE ESTE IMPORT ESTÁ AQUI
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rota 1: Página Principal (Home) */}
         <Route path="/" element={<Home />} />
-        
-        {/* Rota 2: Tela de Login e Cadastro */}
         <Route path="/login" element={<Login />} />
-        
-        {/* Rota 3: Painel do Piloto Logado */}
         <Route path="/painel" element={<UserDashboard />} />
+        <Route path="/sobre" element={<About />} />
+        <Route path="/contato" element={<Contact />} />
       </Routes>
     </BrowserRouter>
   );

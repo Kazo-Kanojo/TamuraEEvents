@@ -1,13 +1,37 @@
 import { useState } from "react";
-import { Link } from "react-router-dom"; // <--- ESTE IMPORT É OBRIGATÓRIO
-import logoTamura from '../assets/logoTamura.jpg'; // Verifique se o caminho da imagem está certo
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import logoTamura from '../assets/logoTamura.png';
 
 const Navbar = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Função para rolar até a classificação
+  const scrollToClassificacao = () => {
+    // Se já estiver na home, só rola
+    if (location.pathname === "/") {
+      const element = document.getElementById("classificacao");
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+    } else {
+      // Se estiver em outra página, vai para a home já mirando no ID
+      // Usamos setTimeout para dar tempo da página carregar antes de rolar
+      navigate("/");
+      setTimeout(() => {
+        const element = document.getElementById("classificacao");
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
+    }
+  };
+
   return (
-    <nav className="bg-[#0a0a0a] text-white shadow-xl border-b-2 border-[#D80000]">
+    <nav className="bg-[#0a0a0a] text-white shadow-xl border-b-2 border-[#D80000] sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center gap-4">
         
-        {/* --- LOGO (Agora com Link para Home) --- */}
+        {/* --- LOGO --- */}
         <Link to="/" className="flex items-center gap-3 group cursor-pointer flex-shrink-0">
           <img 
             src={logoTamura} 
@@ -21,21 +45,35 @@ const Navbar = () => {
 
         {/* --- LINKS CENTRAIS --- */}
         <ul className="hidden md:flex gap-6 font-bold text-sm tracking-wide uppercase whitespace-nowrap">
-          <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
+          
+          {/* LINK DE CLASSIFICAÇÃO (COM SCROLL) */}
+          <li 
+            onClick={scrollToClassificacao}
+            className="hover:text-[#D80000] cursor-pointer transition-colors duration-200"
+          >
             Classificação
           </li>
-          <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
-            Calendário
-          </li>
-          <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
-            Sobre Nós
-          </li>
-          <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
-            Contato
-          </li>
+          
+          <Link to="/">
+             <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
+               Calendário
+             </li>
+          </Link>
+
+          <Link to="/sobre">
+            <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
+              Sobre Nós
+            </li>
+          </Link>
+
+          <Link to="/contato">
+            <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
+              Contato
+            </li>
+          </Link>
         </ul>
 
-        {/* --- BOTÕES (Com Links funcionando) --- */}
+        {/* --- BOTÕES --- */}
         <div className="flex items-center gap-4 flex-shrink-0">
           <Link to="/login">
             <button className="hidden md:block font-bold text-sm hover:text-[#D80000] transition">

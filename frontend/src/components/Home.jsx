@@ -1,41 +1,25 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Navbar from "./Navbar";
 import EventCard from "./EventCard";
 import Standings from "./Standings";
 
 const Home = () => {
-  // Dados simulados
-  const events = [
-    {
-      id: 1,
-      title: "3ª Etapa Copa Tamura",
-      date: "15/12/2025 - 08:00",
-      location: "CT Tamura - Ibiúna/SP",
-      price: "100,00",
-      image: "https://images.unsplash.com/photo-1516226276662-31653e0811c4?q=80&w=800&auto=format&fit=crop" 
-    },
-    {
-      id: 2,
-      title: "Grande Final Regional",
-      date: "20/01/2026 - 08:00",
-      location: "Pista do Alemão - Sorocaba/SP",
-      price: "120,00",
-      image: "https://images.unsplash.com/photo-1568284566453-9bb50b3cb863?q=80&w=800&auto=format&fit=crop"
-    },
-    {
-      id: 3,
-      title: "Treino de Verão",
-      date: "10/02/2026 - 09:00",
-      location: "Arena Velocross",
-      price: "50,00",
-      image: "https://images.unsplash.com/photo-1532509774891-1400d0d09615?q=80&w=800&auto=format&fit=crop"
-    }
-  ];
+  const [events, setEvents] = useState([]);
+
+  // Busca os eventos reais do Backend ao carregar a página
+  useEffect(() => {
+    fetch('http://localhost:3000/events')
+      .then(res => res.json())
+      .then(data => setEvents(data))
+      .catch(err => console.error("Erro ao buscar eventos:", err));
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-[#D80000] selection:text-white">
+    <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-[#D80000] selection:text-white flex flex-col">
       <Navbar />
 
-      {/* Hero Section */}
+      {/* --- HERO SECTION (Banner) --- */}
       <div className="relative bg-[#0a0a0a] border-b-4 border-[#D80000] overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-40">
            <img 
@@ -45,6 +29,7 @@ const Home = () => {
            />
         </div>
         <div className="absolute inset-0 z-10 bg-gradient-to-t from-[#0a0a0a] via-transparent to-[#0a0a0a]/80"></div>
+        
         <div className="relative z-20 container mx-auto px-4 py-24 text-center">
           <h2 className="text-5xl md:text-7xl font-black italic tracking-tighter uppercase mb-6 drop-shadow-lg">
             Acelere para a <span className="text-[#D80000]">Glória</span>
@@ -53,13 +38,16 @@ const Home = () => {
             O sistema oficial de inscrições da Tamura Eventos. 
             Garanta seu gate nas melhores pistas de Velocross da região.
           </p>
-          <button className="bg-[#D80000] hover:bg-red-700 text-white px-8 py-4 rounded font-black uppercase text-lg tracking-widest transition-transform hover:-translate-y-1 shadow-[0_4px_0_rgb(100,0,0)] hover:shadow-[0_2px_0_rgb(100,0,0)] active:shadow-none active:translate-y-0">
-            Ver Calendário 2025
-          </button>
+          
+          <Link to="/login">
+            <button className="bg-[#D80000] hover:bg-red-700 text-white px-8 py-4 rounded font-black uppercase text-lg tracking-widest transition-transform hover:-translate-y-1 shadow-[0_4px_0_rgb(100,0,0)] hover:shadow-[0_2px_0_rgb(100,0,0)] active:shadow-none active:translate-y-0">
+              Quero Correr
+            </button>
+          </Link>
         </div>
       </div>
 
-      {/* Lista de Eventos */}
+      {/* --- LISTA DE EVENTOS (AGORA REAIS) --- */}
       <div className="container mx-auto px-4 py-16">
         <div className="flex items-center gap-4 mb-10">
           <div className="w-2 h-10 bg-[#D80000]"></div>
@@ -67,23 +55,36 @@ const Home = () => {
             Próximas <span className="text-[#D80000]">Etapas</span>
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {events.map((event) => (
-            <EventCard 
-              key={event.id}
-              title={event.title}
-              date={event.date}
-              location={event.location}
-              price={event.price}
-              image={event.image}
-            />
-          ))}
-        </div>
+
+        {events.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {events.map((event) => (
+              // Envolvemos o Card em um Link para levar ao login/painel ao clicar
+              <Link to="/login" key={event.id} className="block">
+                <EventCard 
+                  title={event.title}
+                  date={event.date}
+                  location={event.location}
+                  price={event.price} // Mostra o preço base
+                  image={event.image}
+                />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20 bg-[#1a1a1a] rounded border border-gray-800">
+            <p className="text-gray-500 text-xl italic">Carregando eventos ou aguardando divulgação...</p>
+          </div>
+        )}
       </div>
       
-      {/* Classificação */}
-      <Standings />
-      <div className="pb-20 bg-[#0a0a0a]"></div>
+      {/* --- CLASSIFICAÇÃO --- */}
+      <div id="classificacao" className="scroll-mt-20">
+         <Standings />
+      </div>
+
+      {/* Espaço no final */}
+      <div className="pb-20"></div>
     </div>
   );
 };
