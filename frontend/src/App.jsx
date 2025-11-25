@@ -1,5 +1,5 @@
 import Navbar from "./components/Navbar";
-
+import Standings from "./components/Standings.jsx";
 function App() {
   return (
     <div className="min-h-screen bg-gray-100">
@@ -19,6 +19,7 @@ function App() {
         <div className="mt-10 border-2 border-dashed border-gray-300 p-10 rounded-lg">
           [Aqui entrarão os Cards dos Eventos]
         </div>
+        <Standings></Standings>
       </main>
     </div>
   )
