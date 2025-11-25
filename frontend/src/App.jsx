@@ -1,28 +1,23 @@
-import Navbar from "./components/Navbar";
-import Standings from "./components/Standings.jsx";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "./components/Home";
+import Login from "./components/Login";
+import UserDashboard from "./components/UserDashboard";
+
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Aqui entra nossa Navbar */}
-      <Navbar />
-
-      {/* Área de conteúdo principal (Hero Section) */}
-      <main className="p-8 text-center">
-        <h2 className="text-4xl font-bold text-gray-800 mt-10">
-          Próxima Etapa: Ibiúna
-        </h2>
-        <p className="text-gray-600 mt-2">
-          Garanta sua vaga no gate antes que acabe!
-        </p>
+    <BrowserRouter>
+      <Routes>
+        {/* Rota 1: Página Principal (Home) */}
+        <Route path="/" element={<Home />} />
         
-        {/* Faremos a lista de corridas aqui em breve */}
-        <div className="mt-10 border-2 border-dashed border-gray-300 p-10 rounded-lg">
-          [Aqui entrarão os Cards dos Eventos]
-        </div>
-        <Standings></Standings>
-      </main>
-    </div>
-  )
+        {/* Rota 2: Tela de Login e Cadastro */}
+        <Route path="/login" element={<Login />} />
+        
+        {/* Rota 3: Painel do Piloto Logado */}
+        <Route path="/painel" element={<UserDashboard />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
