@@ -1,79 +1,123 @@
 import { useState } from "react";
 
 const Standings = () => {
-  // 1. Estado para controlar qual categoria está na tela
-  const [activeCategory, setActiveCategory] = useState("VX1");
+  // 1. Lista de Categorias em Ordem Alfabética
+  const categoriesList = [
+    "50cc",
+    "65cc",
+    "Feminino",
+    "Free Force One",
+    "Importada Amador",
+    "Junior",
+    "Nacional Amador",
+    "Open Importada",
+    "Open Nacional",
+    "Over 250",
+    "Ultimate 250x230",
+    "VX 250f Nacional",
+    "VX230",
+    "VX3 Importada",
+    "VX3 Nacional",
+    "VX4",
+    "VX5",
+    "VX6",
+    "VX7"
+  ];
+
+  // 2. Estado para controlar qual categoria está na tela (começa com a primeira da lista)
+  const [activeCategory, setActiveCategory] = useState(categoriesList[0]);
   
-  // 2. Estado para o termo de pesquisa
+  // 3. Estado para o termo de pesquisa
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Dados Mockados (Falsos) para teste
+  // 4. Dados Mockados (Falsos)
+  // Nota: Preenchi algumas categorias com dados de exemplo. 
+  // As outras estão vazias ([]) para não dar erro, mas funcionarão quando tivermos o backend.
   const data = {
-    VX1: [
-      { pos: 1, name: "Carlos 'Danger'", number: 101, team: "Honda Racing", points: 50 },
-      { pos: 2, name: "João Pedro", number: 72, team: "JP Motos", points: 44 },
-      { pos: 3, name: "Matheus Silva", number: 12, team: "Privado", points: 40 },
-      { pos: 4, name: "Lucas Rocha", number: 99, team: "Rocha MX", points: 36 },
-      { pos: 5, name: "Felipe Zanol", number: 33, team: "KTM Brasil", points: 32 },
+    "50cc": [
+        { pos: 1, name: "Pedrinho Silva", number: 10, team: "Kids Racing", points: 50 },
+        { pos: 2, name: "Lucas M.", number: 5, team: "MX School", points: 44 }
     ],
-    VX2: [
-      { pos: 1, name: "Enzo R.", number: 4, team: "Tamura Team", points: 47 },
-      { pos: 2, name: "Bruno C.", number: 22, team: "Yamaha", points: 45 },
-      { pos: 3, name: "Gabriel Souza", number: 10, team: "Gabi Racing", points: 38 },
-      { pos: 4, name: "Rafael M.", number: 88, team: "Fox Racing", points: 30 },
-    ]
+    "65cc": [],
+    "Feminino": [
+        { pos: 1, name: "Ana Souza", number: 22, team: "Girls MX", points: 47 },
+        { pos: 2, name: "Carla Dias", number: 101, team: "Privado", points: 40 }
+    ],
+    "Free Force One": [],
+    "Importada Amador": [
+        { pos: 1, name: "Carlos 'Danger'", number: 7, team: "Honda Racing", points: 50 }
+    ],
+    "Junior": [],
+    "Nacional Amador": [],
+    "Open Importada": [],
+    "Open Nacional": [],
+    "Over 250": [],
+    "Ultimate 250x230": [],
+    "VX 250f Nacional": [],
+    "VX230": [],
+    "VX3 Importada": [],
+    "VX3 Nacional": [],
+    "VX4": [],
+    "VX5": [],
+    "VX6": [],
+    "VX7": []
   };
 
   // Lógica de Filtro (Pesquisa)
-  const filteredPilots = data[activeCategory].filter((pilot) => 
+  // Se a categoria não tiver dados (undefined), usa um array vazio []
+  const currentCategoryData = data[activeCategory] || [];
+  
+  const filteredPilots = currentCategoryData.filter((pilot) => 
     pilot.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     pilot.number.toString().includes(searchTerm)
   );
 
   return (
-    <section className="bg-[#0a0a0a] py-10 text-white border-t border-gray-900">
+    <section className="bg-[#0a0a0a] py-10 text-white border-t border-gray-900 mt-10">
       <div className="container mx-auto px-4">
         
         {/* Cabeçalho da Seção */}
         <div className="mb-8 border-l-4 border-[#D80000] pl-4">
           <h2 className="text-3xl font-black italic uppercase">Classificação <span className="text-[#D80000]">Geral</span></h2>
-          <p className="text-gray-400 text-sm">Acompanhe a pontuação atualizada do campeonato.</p>
+          <p className="text-gray-400 text-sm">Selecione uma categoria para ver o ranking.</p>
         </div>
 
-        {/* Controles: Seleção de Categoria e Pesquisa */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+        {/* --- CONTROLES --- */}
+        <div className="flex flex-col gap-6 mb-8">
           
-          {/* Botões das Categorias */}
-          <div className="flex gap-2">
-            {["VX1", "VX2"].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-6 py-2 font-bold italic text-lg rounded skew-x-[-10deg] transition-all duration-300 border border-[#D80000]
-                  ${activeCategory === cat 
-                    ? "bg-[#D80000] text-white shadow-[0_0_15px_rgba(216,0,0,0.5)]" 
-                    : "bg-transparent text-gray-400 hover:text-white hover:border-white"
-                  }`}
-              >
-                <span className="skew-x-[10deg] inline-block">{cat}</span>
-              </button>
-            ))}
+          {/* 1. Botões das Categorias (Com Scroll Horizontal para caber todas) */}
+          <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
+            <div className="flex gap-2 min-w-max">
+              {categoriesList.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-4 py-2 font-bold italic text-sm uppercase rounded skew-x-[-10deg] transition-all duration-300 border border-[#D80000] whitespace-nowrap
+                    ${activeCategory === cat 
+                      ? "bg-[#D80000] text-white shadow-[0_0_10px_rgba(216,0,0,0.5)] scale-105" 
+                      : "bg-transparent text-gray-400 hover:text-white hover:border-white"
+                    }`}
+                >
+                  <span className="skew-x-[10deg] inline-block">{cat}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Campo de Pesquisa */}
-          <div className="w-full md:w-1/3 relative">
+          {/* 2. Campo de Pesquisa */}
+          <div className="w-full relative">
             <input
               type="text"
-              placeholder="Buscar piloto ou número..."
+              placeholder={`Buscar piloto na categoria ${activeCategory}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#1a1a1a] border border-gray-700 text-white px-4 py-2 rounded focus:outline-none focus:border-[#D80000] focus:ring-1 focus:ring-[#D80000] transition placeholder-gray-500"
+              className="w-full bg-[#1a1a1a] border border-gray-700 text-white px-4 py-3 rounded focus:outline-none focus:border-[#D80000] focus:ring-1 focus:ring-[#D80000] transition placeholder-gray-500"
             />
           </div>
         </div>
 
-        {/* Tabela de Resultados */}
-        <div className="bg-[#1a1a1a] rounded-lg overflow-hidden border border-gray-800 shadow-xl">
+        {/* --- TABELA DE RESULTADOS --- */}
+        <div className="bg-[#1a1a1a] rounded-lg overflow-hidden border border-gray-800 shadow-xl min-h-[200px]">
           <table className="w-full text-left">
             <thead className="bg-[#D80000] text-white uppercase text-sm font-black italic">
               <tr>
@@ -94,10 +138,10 @@ const Standings = () => {
                     <td className="p-4 text-center font-bold text-[#D80000] text-lg italic">
                       {pilot.number}
                     </td>
-                    <td className="p-4 font-medium">
+                    <td className="p-4 font-medium uppercase">
                       {pilot.name}
                     </td>
-                    <td className="p-4 text-gray-500 hidden md:table-cell text-sm">
+                    <td className="p-4 text-gray-500 hidden md:table-cell text-sm uppercase">
                       {pilot.team}
                     </td>
                     <td className="p-4 text-center font-black text-xl text-white">
@@ -107,8 +151,13 @@ const Standings = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5" className="p-8 text-center text-gray-500 italic">
-                    Nenhum piloto encontrado.
+                  <td colSpan="5" className="p-12 text-center text-gray-500 italic">
+                    <p className="mb-2">Nenhum resultado encontrado.</p>
+                    <p className="text-xs text-gray-600">
+                      {currentCategoryData.length === 0 
+                        ? "Ainda não há dados cadastrados para esta categoria." 
+                        : `Não encontramos ninguem com o nome "${searchTerm}" em ${activeCategory}.`}
+                    </p>
                   </td>
                 </tr>
               )}
