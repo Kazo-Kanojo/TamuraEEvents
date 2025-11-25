@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 const Standings = () => {
-  // 1. Lista de Categorias em Ordem Alfabética
+  // 1. Lista Completa de Categorias
   const categoriesList = [
     "50cc",
     "65cc",
@@ -24,15 +24,12 @@ const Standings = () => {
     "VX7"
   ];
 
-  // 2. Estado para controlar qual categoria está na tela (começa com a primeira da lista)
+  // 2. Estados
   const [activeCategory, setActiveCategory] = useState(categoriesList[0]);
-  
-  // 3. Estado para o termo de pesquisa
-  const [searchTerm, setSearchTerm] = useState("");
+  const [pilotSearch, setPilotSearch] = useState("");      // Busca de pilotos
+  const [categorySearch, setCategorySearch] = useState(""); // Nova busca de categorias
 
-  // 4. Dados Mockados (Falsos)
-  // Nota: Preenchi algumas categorias com dados de exemplo. 
-  // As outras estão vazias ([]) para não dar erro, mas funcionarão quando tivermos o backend.
+  // 3. Dados Mockados (Falsos)
   const data = {
     "50cc": [
         { pos: 1, name: "Pedrinho Silva", number: 10, team: "Kids Racing", points: 50 },
@@ -63,13 +60,18 @@ const Standings = () => {
     "VX7": []
   };
 
-  // Lógica de Filtro (Pesquisa)
-  // Se a categoria não tiver dados (undefined), usa um array vazio []
+  // --- LÓGICA DE FILTROS ---
+
+  // A. Filtrar os BOTÕES das categorias baseado no que foi digitado
+  const visibleCategories = categoriesList.filter((cat) => 
+    cat.toLowerCase().includes(categorySearch.toLowerCase())
+  );
+
+  // B. Filtrar os PILOTOS da categoria ativa
   const currentCategoryData = data[activeCategory] || [];
-  
   const filteredPilots = currentCategoryData.filter((pilot) => 
-    pilot.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    pilot.number.toString().includes(searchTerm)
+    pilot.name.toLowerCase().includes(pilotSearch.toLowerCase()) || 
+    pilot.number.toString().includes(pilotSearch)
   );
 
   return (
@@ -79,41 +81,68 @@ const Standings = () => {
         {/* Cabeçalho da Seção */}
         <div className="mb-8 border-l-4 border-[#D80000] pl-4">
           <h2 className="text-3xl font-black italic uppercase">Classificação <span className="text-[#D80000]">Geral</span></h2>
-          <p className="text-gray-400 text-sm">Selecione uma categoria para ver o ranking.</p>
+          <p className="text-gray-400 text-sm">Selecione a categoria abaixo para ver o ranking.</p>
         </div>
 
-        {/* --- CONTROLES --- */}
-        <div className="flex flex-col gap-6 mb-8">
+        {/* --- ÁREA DE SELEÇÃO DE CATEGORIA --- */}
+        <div className="flex flex-col gap-4 mb-8">
           
-          {/* 1. Botões das Categorias (Com Scroll Horizontal para caber todas) */}
-          <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-            <div className="flex gap-2 min-w-max">
-              {categoriesList.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-4 py-2 font-bold italic text-sm uppercase rounded skew-x-[-10deg] transition-all duration-300 border border-[#D80000] whitespace-nowrap
-                    ${activeCategory === cat 
-                      ? "bg-[#D80000] text-white shadow-[0_0_10px_rgba(216,0,0,0.5)] scale-105" 
-                      : "bg-transparent text-gray-400 hover:text-white hover:border-white"
-                    }`}
-                >
-                  <span className="skew-x-[10deg] inline-block">{cat}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 2. Campo de Pesquisa */}
-          <div className="w-full relative">
-            <input
+          {/* Input para filtrar os botões das categorias */}
+          <div className="w-full md:w-1/3">
+             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">
+               Encontrar Categoria:
+             </label>
+             <input
               type="text"
-              placeholder={`Buscar piloto na categoria ${activeCategory}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#1a1a1a] border border-gray-700 text-white px-4 py-3 rounded focus:outline-none focus:border-[#D80000] focus:ring-1 focus:ring-[#D80000] transition placeholder-gray-500"
+              placeholder="Ex: VX, 50cc, Open..."
+              value={categorySearch}
+              onChange={(e) => setCategorySearch(e.target.value)}
+              className="w-full bg-[#1a1a1a] border border-gray-800 text-white text-sm px-3 py-2 rounded focus:outline-none focus:border-[#D80000] transition"
             />
           </div>
+
+          {/* Lista de Botões (Com Scroll Horizontal) */}
+          <div className="w-full overflow-x-auto pb-4 scrollbar-hide border-b border-gray-900">
+            <div className="flex gap-2 min-w-max">
+              {visibleCategories.length > 0 ? (
+                visibleCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`px-4 py-2 font-bold italic text-sm uppercase rounded skew-x-[-10deg] transition-all duration-300 border border-[#D80000] whitespace-nowrap
+                      ${activeCategory === cat 
+                        ? "bg-[#D80000] text-white shadow-[0_0_10px_rgba(216,0,0,0.5)] scale-105" 
+                        : "bg-transparent text-gray-400 hover:text-white hover:border-white"
+                      }`}
+                  >
+                    <span className="skew-x-[10deg] inline-block">{cat}</span>
+                  </button>
+                ))
+              ) : (
+                <span className="text-gray-500 italic py-2">Nenhuma categoria encontrada.</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* --- ÁREA DE PESQUISA DE PILOTO --- */}
+        <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-4">
+            <div>
+                <h3 className="text-2xl font-bold italic uppercase text-[#D80000]">
+                    {activeCategory}
+                </h3>
+                <span className="text-xs text-gray-500 uppercase tracking-widest">Categoria Selecionada</span>
+            </div>
+
+            <div className="w-full md:w-1/3 relative">
+                <input
+                type="text"
+                placeholder={`Buscar piloto em ${activeCategory}...`}
+                value={pilotSearch}
+                onChange={(e) => setPilotSearch(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-gray-700 text-white px-4 py-3 rounded focus:outline-none focus:border-[#D80000] focus:ring-1 focus:ring-[#D80000] transition placeholder-gray-500"
+                />
+            </div>
         </div>
 
         {/* --- TABELA DE RESULTADOS --- */}
@@ -152,12 +181,7 @@ const Standings = () => {
               ) : (
                 <tr>
                   <td colSpan="5" className="p-12 text-center text-gray-500 italic">
-                    <p className="mb-2">Nenhum resultado encontrado.</p>
-                    <p className="text-xs text-gray-600">
-                      {currentCategoryData.length === 0 
-                        ? "Ainda não há dados cadastrados para esta categoria." 
-                        : `Não encontramos ninguem com o nome "${searchTerm}" em ${activeCategory}.`}
-                    </p>
+                    <p className="mb-2">Nenhum piloto encontrado.</p>
                   </td>
                 </tr>
               )}
