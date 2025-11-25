@@ -8,7 +8,7 @@ const Navbar = () => {
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         
         {/* --- LOGO --- */}
-        <div className="flex items-center gap-3 group cursor-pointer">
+        <div className="flex items-center gap-3 group cursor-pointer mr-3">
           <div className="w-10 h-10 bg-[#D80000] rounded flex items-center justify-center transform group-hover:skew-x-[-10deg] transition duration-300">
             <span className="font-black text-xl italic text-white">T</span>
           </div>
@@ -18,21 +18,24 @@ const Navbar = () => {
         </div>
 
         {/* --- LINKS (Desktop) --- */}
-        {/* Adicionei 'flex-1 justify-center' para tentar centralizar os links, se quiser */}
+        {/* Atualizado para: Classificação, Calendário, Sobre Nós, Contato */}
         <ul className="hidden md:flex gap-8 font-bold text-sm tracking-wide uppercase">
           <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
-            Eventos
+            Classificação
           </li>
           <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
-            Categorias
+            Calendário
           </li>
           <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
-            Resultados
+            Sobre
+          </li>
+          <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
+            Contato
           </li>
         </ul>
 
         {/* --- BOTÕES --- */}
-        <div className="flex items-center gap-4 ml-7">
+        <div className="flex items-center gap-4 ml-8">
           <button className="hidden md:block font-bold text-sm hover:text-[#D80000] transition">
             LOGIN
           </button>
