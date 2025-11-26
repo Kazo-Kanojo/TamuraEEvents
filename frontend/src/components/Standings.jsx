@@ -1,196 +1,148 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Trophy, Search, Filter, Calendar } from "lucide-react";
 
 const Standings = () => {
-  // 1. Lista Completa de Categorias
   const categoriesList = [
-    "50cc",
-    "65cc",
-    "Feminino",
-    "Free Force One",
-    "Importada Amador",
-    "Junior",
-    "Nacional Amador",
-    "Open Importada",
-    "Open Nacional",
-    "Over 250",
-    "Ultimate 250x230",
-    "VX 250f Nacional",
-    "VX230",
-    "VX3 Importada",
-    "VX3 Nacional",
-    "VX4",
-    "VX5",
-    "VX6",
-    "VX7"
+    "50cc", "65cc", "Feminino", "Free Force One", "Importada Amador",
+    "Junior", "Nacional Amador", "Open Importada", "Open Nacional",
+    "Over 250", "Ultimate 250x230", "VX 250f Nacional", "VX230",
+    "VX3 Importada", "VX3 Nacional", "VX4", "VX5", "VX6", "VX7",
+    "Trilheiros Nacional", "Trilheiros Importada"
   ];
 
-  // 2. Estados
   const [activeCategory, setActiveCategory] = useState(categoriesList[0]);
-  const [pilotSearch, setPilotSearch] = useState("");      // Busca de pilotos
-  const [categorySearch, setCategorySearch] = useState(""); // Nova busca de categorias
+  const [rankings, setRankings] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [stages, setStages] = useState([]);
+  const [viewMode, setViewMode] = useState('overall');
 
-  // 3. Dados Mockados (Falsos)
-  const data = {
-    "50cc": [
-        { pos: 1, name: "Pedrinho Silva", number: 10, team: "Kids Racing", points: 50 },
-        { pos: 2, name: "Lucas M.", number: 5, team: "MX School", points: 44 }
-    ],
-    "65cc": [],
-    "Feminino": [
-        { pos: 1, name: "Ana Souza", number: 22, team: "Girls MX", points: 47 },
-        { pos: 2, name: "Carla Dias", number: 101, team: "Privado", points: 40 }
-    ],
-    "Free Force One": [],
-    "Importada Amador": [
-        { pos: 1, name: "Carlos 'Danger'", number: 7, team: "Honda Racing", points: 50 }
-    ],
-    "Junior": [],
-    "Nacional Amador": [],
-    "Open Importada": [],
-    "Open Nacional": [],
-    "Over 250": [],
-    "Ultimate 250x230": [],
-    "VX 250f Nacional": [],
-    "VX230": [],
-    "VX3 Importada": [],
-    "VX3 Nacional": [],
-    "VX4": [],
-    "VX5": [],
-    "VX6": [],
-    "VX7": []
-  };
+  useEffect(() => {
+    fetch('http://localhost:3000/api/stages')
+      .then(res => res.json())
+      .then(data => setStages(data))
+      .catch(err => console.error(err));
+  }, []);
 
-  // --- LÓGICA DE FILTROS ---
+  useEffect(() => {
+    setLoading(true);
+    const url = viewMode === 'overall' 
+      ? 'http://localhost:3000/api/standings/overall'
+      : `http://localhost:3000/api/stages/${viewMode}/standings`;
 
-  // A. Filtrar os BOTÕES das categorias baseado no que foi digitado
-  const visibleCategories = categoriesList.filter((cat) => 
-    cat.toLowerCase().includes(categorySearch.toLowerCase())
-  );
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        const grouped = {};
+        categoriesList.forEach(cat => grouped[cat] = []);
+        data.forEach(record => {
+          const catKey = categoriesList.find(c => c.toLowerCase() === record.category.trim().toLowerCase()) || record.category;
+          if (!grouped[catKey]) grouped[catKey] = [];
+          grouped[catKey].push({
+            name: record.pilot_name,
+            number: record.pilot_number,
+            points: record.total_points
+          });
+        });
+        setRankings(grouped);
+        setLoading(false);
+      })
+      .catch(err => setLoading(false));
+  }, [viewMode]);
 
-  // B. Filtrar os PILOTOS da categoria ativa
-  const currentCategoryData = data[activeCategory] || [];
-  const filteredPilots = currentCategoryData.filter((pilot) => 
-    pilot.name.toLowerCase().includes(pilotSearch.toLowerCase()) || 
-    pilot.number.toString().includes(pilotSearch)
+  const currentList = rankings[activeCategory] || [];
+  const filteredPilots = currentList.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.number.includes(searchTerm)
   );
 
   return (
-    <section className="bg-[#0a0a0a] py-10 text-white border-t border-gray-900 mt-10">
-      <div className="container mx-auto px-4">
-        
-        {/* Cabeçalho da Seção */}
-        <div className="mb-8 border-l-4 border-[#D80000] pl-4">
-          <h2 className="text-3xl font-black italic uppercase">Classificação <span className="text-[#D80000]">Geral</span></h2>
-          <p className="text-gray-400 text-sm">Selecione a categoria abaixo para ver o ranking.</p>
-        </div>
-
-        {/* --- ÁREA DE SELEÇÃO DE CATEGORIA --- */}
-        <div className="flex flex-col gap-4 mb-8">
-          
-          {/* Input para filtrar os botões das categorias */}
-          <div className="w-full md:w-1/3">
-             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">
-               Encontrar Categoria:
-             </label>
-             <input
-              type="text"
-              placeholder="Ex: VX, 50cc, Open..."
-              value={categorySearch}
-              onChange={(e) => setCategorySearch(e.target.value)}
-              className="w-full bg-[#1a1a1a] border border-gray-800 text-white text-sm px-3 py-2 rounded focus:outline-none focus:border-[#D80000] transition"
+    <div className="w-full bg-[#111] rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
+      <div className="p-6 md:p-8 bg-gradient-to-r from-[#1a1a1a] to-[#0a0a0a] border-b border-gray-800">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-3xl font-black italic uppercase flex items-center gap-3 text-white">
+                <Trophy className="text-[#D80000]" size={32} />
+                {viewMode === 'overall' ? 'Ranking Geral' : 'Resultado da Etapa'}
+              </h2>
+              <p className="text-gray-400 text-sm mt-1">
+                {viewMode === 'overall' ? 'Soma de todas as etapas' : stages.find(s => s.id == viewMode)?.name}
+              </p>
+            </div>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                <Filter size={16} className="text-[#D80000]" />
+              </div>
+              <select 
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value)}
+                className="appearance-none bg-[#0a0a0a] border border-gray-700 text-white py-3 pl-10 pr-10 rounded-lg font-bold uppercase text-sm focus:border-[#D80000] focus:outline-none cursor-pointer hover:border-gray-500 transition min-w-[200px]"
+              >
+                <option value="overall">🏆 Campeonato Completo</option>
+                <optgroup label="Etapas Individuais">
+                  {stages.map(stage => (
+                    <option key={stage.id} value={stage.id}>📍 {stage.name}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          </div>
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-3 text-gray-500" size={18} />
+            <input 
+              type="text" 
+              placeholder="Buscar piloto..." 
+              className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-sm text-white focus:border-[#D80000] outline-none transition"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
-
-          {/* Lista de Botões (Com Scroll Horizontal) */}
-          <div className="w-full overflow-x-auto pb-4 scrollbar-hide border-b border-gray-900">
-            <div className="flex gap-2 min-w-max">
-              {visibleCategories.length > 0 ? (
-                visibleCategories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={`px-4 py-2 font-bold italic text-sm uppercase rounded skew-x-[-10deg] transition-all duration-300 border border-[#D80000] whitespace-nowrap
-                      ${activeCategory === cat 
-                        ? "bg-[#D80000] text-white shadow-[0_0_10px_rgba(216,0,0,0.5)] scale-105" 
-                        : "bg-transparent text-gray-400 hover:text-white hover:border-white"
-                      }`}
-                  >
-                    <span className="skew-x-[10deg] inline-block">{cat}</span>
-                  </button>
-                ))
-              ) : (
-                <span className="text-gray-500 italic py-2">Nenhuma categoria encontrada.</span>
-              )}
-            </div>
-          </div>
         </div>
-
-        {/* --- ÁREA DE PESQUISA DE PILOTO --- */}
-        <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-4">
-            <div>
-                <h3 className="text-2xl font-bold italic uppercase text-[#D80000]">
-                    {activeCategory}
-                </h3>
-                <span className="text-xs text-gray-500 uppercase tracking-widest">Categoria Selecionada</span>
-            </div>
-
-            <div className="w-full md:w-1/3 relative">
-                <input
-                type="text"
-                placeholder={`Buscar piloto em ${activeCategory}...`}
-                value={pilotSearch}
-                onChange={(e) => setPilotSearch(e.target.value)}
-                className="w-full bg-[#1a1a1a] border border-gray-700 text-white px-4 py-3 rounded focus:outline-none focus:border-[#D80000] focus:ring-1 focus:ring-[#D80000] transition placeholder-gray-500"
-                />
-            </div>
+      </div>
+      <div className="bg-[#151515] border-b border-gray-800 p-2 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 min-w-max px-2">
+          {categoriesList.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`px-5 py-2 rounded text-xs font-black uppercase tracking-wider transition-all skew-x-[-10deg] ${activeCategory === cat ? 'bg-[#D80000] text-white shadow-[0_0_15px_rgba(216,0,0,0.4)]' : 'bg-[#222] text-gray-500 hover:text-white hover:bg-[#333]'}`}
+            >
+              <span className="skew-x-[10deg] inline-block">{cat}</span>
+            </button>
+          ))}
         </div>
-
-        {/* --- TABELA DE RESULTADOS --- */}
-        <div className="bg-[#1a1a1a] rounded-lg overflow-hidden border border-gray-800 shadow-xl min-h-[200px]">
-          <table className="w-full text-left">
-            <thead className="bg-[#D80000] text-white uppercase text-sm font-black italic">
+      </div>
+      <div className="min-h-[300px] bg-[#0a0a0a]">
+        {loading ? (
+          <div className="flex justify-center items-center h-64 text-gray-500">Calculando...</div>
+        ) : (
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-[#111] text-gray-500 text-xs uppercase font-bold tracking-widest sticky top-0">
               <tr>
-                <th className="p-4 text-center w-16">Pos</th>
-                <th className="p-4 w-16 text-center">#</th>
+                <th className="p-4 text-center w-20">Pos</th>
+                <th className="p-4 text-center w-24">Nº Moto</th>
                 <th className="p-4">Piloto</th>
-                <th className="p-4 hidden md:table-cell">Equipe</th>
-                <th className="p-4 text-center font-bold text-lg">Pts</th>
+                <th className="p-4 text-center w-24 text-[#D80000] bg-[#D80000]/5">Pts</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-gray-800 text-sm">
               {filteredPilots.length > 0 ? (
-                filteredPilots.map((pilot, index) => (
-                  <tr key={index} className="hover:bg-gray-800 transition duration-200 group">
-                    <td className="p-4 text-center font-bold text-gray-400 group-hover:text-white">
-                      {pilot.pos}º
-                    </td>
-                    <td className="p-4 text-center font-bold text-[#D80000] text-lg italic">
-                      {pilot.number}
-                    </td>
-                    <td className="p-4 font-medium uppercase">
-                      {pilot.name}
-                    </td>
-                    <td className="p-4 text-gray-500 hidden md:table-cell text-sm uppercase">
-                      {pilot.team}
-                    </td>
-                    <td className="p-4 text-center font-black text-xl text-white">
-                      {pilot.points}
-                    </td>
+                filteredPilots.map((pilot, idx) => (
+                  <tr key={idx} className="hover:bg-[#1f1f1f] transition-colors group">
+                    <td className="p-4 text-center font-bold text-gray-400 group-hover:text-white">{idx + 1}º</td>
+                    <td className="p-4 text-center"><span className="font-mono font-bold text-[#D80000] bg-[#1a1a1a] px-2 py-1 rounded border border-gray-800">{pilot.number}</span></td>
+                    <td className="p-4 font-bold text-gray-200 group-hover:text-white uppercase">{pilot.name}</td>
+                    <td className="p-4 text-center font-black text-xl text-white bg-[#D80000]/5 group-hover:bg-[#D80000]/10">{pilot.points}</td>
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan="5" className="p-12 text-center text-gray-500 italic">
-                    <p className="mb-2">Nenhum piloto encontrado.</p>
-                  </td>
-                </tr>
+                <tr><td colSpan="4" className="p-16 text-center text-gray-600 italic">Nenhuma pontuação.</td></tr>
               )}
             </tbody>
           </table>
-        </div>
-
+        )}
       </div>
-    </section>
+    </div>
   );
 };
 

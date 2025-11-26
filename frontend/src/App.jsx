@@ -1,24 +1,35 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "./components/Home";
-import Login from "./components/Login";
-import UserDashboard from "./components/UserDashboard";
-import AdminDashboard from "./components/AdminDashboard"; // <--- IMPORTAR
-import About from "./components/About";
-import Contact from "./components/Contact";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Home from './components/Home';
+import Login from './components/Login';
+import AdminDashboard from './components/AdminDashboard';
+import UserDashboard from './components/UserDashboard';
+import Registration from './components/Registration';
+
+const AdminRoute = ({ children }) => {
+  const userStorage = localStorage.getItem('user');
+  const user = userStorage ? JSON.parse(userStorage) : null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'admin') return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
+const PrivateRoute = ({ children }) => {
+  const userStorage = localStorage.getItem('user');
+  return userStorage ? children : <Navigate to="/login" replace />;
+};
 
 function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/painel" element={<UserDashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} /> {/* <--- NOVA ROTA */}
-        <Route path="/sobre" element={<About />} />
-        <Route path="/contato" element={<Contact />} />
+        <Route path="/dashboard" element={<PrivateRoute><UserDashboard /></PrivateRoute>} />
+        <Route path="/event/:id/register" element={<PrivateRoute><Registration /></PrivateRoute>} />
+        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       </Routes>
-    </BrowserRouter>
+    </Router>
   );
 }
-
 export default App;

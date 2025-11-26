@@ -27,7 +27,7 @@ const Home = () => {
       <div className="relative bg-[#0a0a0a] border-b-4 border-[#D80000] overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-40">
            <img 
-            src="/bgTamura.jpeg" 
+            src="../../public/bgLandPage.jpeg" 
             className="w-full h-full object-cover grayscale" 
             alt="Fundo Motocross"
            />
@@ -65,7 +65,7 @@ const Home = () => {
         {events.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {events.map((event) => (
-              <Link to="/login" key={event.id} className="block group">
+              <Link to={`/event/${event.id}/register`} key={event.id} className="block group">
                 <EventCard 
                   title={event.name}
                   date={event.date}
