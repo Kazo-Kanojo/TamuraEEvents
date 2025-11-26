@@ -46,14 +46,6 @@ const Navbar = () => {
         {/* --- LINKS CENTRAIS --- */}
         <ul className="hidden md:flex gap-6 font-bold text-sm tracking-wide uppercase whitespace-nowrap">
           
-          {/* LINK DE CLASSIFICAÇÃO (COM SCROLL) */}
-          <li 
-            onClick={scrollToClassificacao}
-            className="hover:text-[#D80000] cursor-pointer transition-colors duration-200"
-          >
-            Classificação
-          </li>
-          
           <Link to="/">
              <li className="hover:text-[#D80000] cursor-pointer transition-colors duration-200">
                Calendário
