@@ -5,7 +5,7 @@ const EventCard = ({ title, date, location, price, image }) => {
       {/* 1. Imagem do Evento */}
       <div className="relative h-48 overflow-hidden">
         <img 
-          src={"https://www.webmotors.com.br/wp-content/uploads/2022/01/04173246/1.-Honda-CG-160.jpg"} 
+          src={"../../public/imagemEtapas.jpg"} 
           alt={title} 
           className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
         />
