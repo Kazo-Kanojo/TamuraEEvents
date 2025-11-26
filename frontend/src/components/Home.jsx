@@ -23,7 +23,7 @@ const Home = () => {
       <div className="relative bg-[#0a0a0a] border-b-4 border-[#D80000] overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-40">
            <img 
-            src="https://images.unsplash.com/photo-1599474924187-334a4ae513df?q=80&w=1920&auto=format&fit=crop" 
+            src="../../public/bgTamura.jpeg" 
             className="w-full h-full object-cover grayscale" 
             alt="Fundo Motocross"
            />
