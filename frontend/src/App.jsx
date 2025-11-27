@@ -5,6 +5,8 @@ import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
 import Registration from './components/Registration';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 
 const AdminRoute = ({ children }) => {
   const userStorage = localStorage.getItem('user');
@@ -23,6 +25,8 @@ function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<PrivateRoute><UserDashboard /></PrivateRoute>} />

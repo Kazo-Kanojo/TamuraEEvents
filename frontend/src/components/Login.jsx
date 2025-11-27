@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
-import { User, Mail, Lock, Phone, Bike, CreditCard, ArrowRight, LogIn } from 'lucide-react';
+import { User, Lock, ArrowRight, LogIn } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,7 +14,6 @@ const Login = () => {
     identifier: '', password: '', name: '', email: '', phone: '', cpf: '', bike_number: ''
   });
 
-  // --- NOVO: Verifica se já está logado ao abrir a página ---
   useEffect(() => {
     const userStorage = localStorage.getItem('user');
     if (userStorage) {
@@ -48,13 +47,11 @@ const Login = () => {
       if (!response.ok) throw new Error(data.error || "Erro ao processar");
 
       if (isLogin) {
-        // --- SALVA E REDIRECIONA ---
         localStorage.setItem('user', JSON.stringify(data));
         
         if (data.role === 'admin') {
             navigate('/admin');
         } else {
-            // O PULO DO GATO: Manda para o Dashboard, não para a Home
             navigate('/dashboard'); 
         }
       } else {
@@ -72,8 +69,6 @@ const Login = () => {
   };
 
   return (
-    // ... (Mantenha o restante do seu JSX de formulário aqui, ele está correto)
-    // Vou resumir o JSX para não ficar gigante, mas mantenha o visual que fizemos
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col font-sans text-white selection:bg-[#D80000] selection:text-white">
       <Navbar />
       <div className="flex-grow flex items-center justify-center px-4 py-12">
@@ -94,13 +89,11 @@ const Login = () => {
                   </div>
                 </div>
               ) : (
-                // ... Seus campos de cadastro (Nome, Telefone, Moto, CPF, Email) ...
                 <>
                   <div>
                     <label className="block text-xs text-gray-500 uppercase font-bold mb-1">Nome</label>
                     <input type="text" name="name" required className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-gray-200 focus:border-[#D80000] focus:outline-none" value={formData.name} onChange={handleChange} />
                   </div>
-                  {/* Adicione os outros inputs aqui igual ao código anterior */}
                   <input type="text" name="phone" placeholder="Telefone" className="w-full bg-[#0a0a0a] border-gray-700 rounded-lg p-3 mb-2" value={formData.phone} onChange={handleChange} required/>
                   <input type="text" name="bike_number" placeholder="Nº Moto" className="w-full bg-[#0a0a0a] border-gray-700 rounded-lg p-3 mb-2" value={formData.bike_number} onChange={handleChange} required/>
                   <input type="text" name="cpf" placeholder="CPF" className="w-full bg-[#0a0a0a] border-gray-700 rounded-lg p-3 mb-2" value={formData.cpf} onChange={handleChange} required/>
@@ -113,6 +106,14 @@ const Login = () => {
                   <Lock className="absolute left-3 top-3 text-gray-600" size={18} />
                   <input type="password" name="password" required placeholder="******" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-[#D80000] focus:outline-none" value={formData.password} onChange={handleChange} />
                 </div>
+                
+                {/* CORREÇÃO AQUI: className em vez de class */}
+                {isLogin && (
+                    <div className="text-right mt-2">
+                        <Link to="/forgot-password" className="text-xs text-gray-500 hover:text-[#D80000] transition">Esqueceu a senha?</Link>
+                    </div>
+                )}
+
               </div>
               <button type="submit" disabled={loading} className="w-full bg-[#D80000] hover:bg-red-700 text-white font-black uppercase py-4 rounded-lg tracking-widest shadow-lg hover:translate-y-[2px] transition-all flex items-center justify-center gap-2">
                 {loading ? 'Carregando...' : (isLogin ? 'Entrar' : 'Cadastrar')}

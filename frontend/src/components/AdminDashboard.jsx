@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { 
   LogOut, Calendar, MapPin, Upload, Plus, Edit3, AlertCircle, CheckCircle, 
   Check, ArrowLeft, Trash2, RefreshCw, X, ImageIcon, Search, Users, 
-  Shield, Bike, ClipboardList, DollarSign, Wallet, MessageCircle, Tag, Save, Layers
-} from 'lucide-react';
+  Shield, Bike, ClipboardList, DollarSign, Wallet, MessageCircle, Tag, Save, Layers, FileText, Download
+} from 'lucide-react'; // ADICIONADO: Download
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const VELOCROSS_CATEGORIES = [
   "50cc", "65cc", "Feminino", "Free Force One", "Importada Amador", 
@@ -28,6 +30,7 @@ const AdminDashboard = () => {
 
   // --- ESTADOS DE USUÁRIOS ---
   const [usersList, setUsersList] = useState([]);
+  const [userSearch, setUserSearch] = useState(''); // NOVO: Busca de Usuário
   const [editingUser, setEditingUser] = useState(null); 
   const [userForm, setUserForm] = useState({ 
       id: null, name: '', email: '', phone: '', bike_number: '', chip_id: '', role: 'user' 
@@ -43,11 +46,21 @@ const AdminDashboard = () => {
   // --- ESTADOS DE INSCRIÇÕES ---
   const [selectedStageReg, setSelectedStageReg] = useState(null); 
   const [registrationsList, setRegistrationsList] = useState([]); 
+  const [regSearch, setRegSearch] = useState(''); // NOVO: Busca de Inscrição
 
-  // --- ESTADOS DE PLANOS (PREÇOS E LOTE) ---
-  const [plans, setPlans] = useState([]); // Dados originais
-  const [localPlans, setLocalPlans] = useState([]); // Dados edição
-  const [batchName, setBatchName] = useState(''); // Nome do Lote
+  // --- ESTADOS DE PLANOS E CONFIGURAÇÕES ---
+  const [plans, setPlans] = useState([]); 
+  const [localPlans, setLocalPlans] = useState([]); 
+  const [batchName, setBatchName] = useState(''); 
+  const [pixKey, setPixKey] = useState(''); 
+
+  // --- HELPER: PEGAR TOKEN DO USUÁRIO ---
+  const getAuthHeaders = (isJson = true) => {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const headers = { 'Authorization': `Bearer ${user?.token}` };
+      if (isJson) headers['Content-Type'] = 'application/json';
+      return headers;
+  };
 
   // --- PROTEÇÃO DE ROTA ---
   useEffect(() => {
@@ -70,11 +83,10 @@ const AdminDashboard = () => {
   useEffect(() => { 
       if (activeTab === 'plans') {
           fetchPlans();
-          fetchBatchName();
+          fetchSettings(); 
       } 
   }, [activeTab]);
   
-  // Efeitos condicionais
   useEffect(() => { if (selectedStage) fetchCategoryStatus(selectedStage.id); }, [selectedStage]);
   useEffect(() => { if (selectedStage && selectedCategory) fetchCategoryResults(selectedStage.id, selectedCategory); }, [selectedCategory]);
   useEffect(() => { if (selectedStageReg) fetchRegistrations(selectedStageReg.id); }, [selectedStageReg]);
@@ -105,6 +117,7 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!formData.name || !formData.date) return showMessage("Preencha nome e data", "error");
     setLoading(true);
+    
     const dataToSend = new FormData();
     dataToSend.append('name', formData.name);
     dataToSend.append('location', formData.location);
@@ -114,7 +127,13 @@ const AdminDashboard = () => {
     try {
       let url = formData.id ? `http://localhost:3000/api/stages/${formData.id}` : 'http://localhost:3000/api/stages';
       let method = formData.id ? 'PUT' : 'POST';
-      const res = await fetch(url, { method: method, body: dataToSend });
+      
+      const res = await fetch(url, { 
+          method: method, 
+          headers: getAuthHeaders(false), 
+          body: dataToSend 
+      });
+      
       if (res.ok) {
         showMessage(formData.id ? "Atualizado!" : "Criado!", "success");
         resetForm();
@@ -127,7 +146,10 @@ const AdminDashboard = () => {
     if (!window.confirm("Isso apagará todas as inscrições e resultados!")) return;
     setLoading(true);
     try {
-        const res = await fetch(`http://localhost:3000/api/stages/${id}`, { method: 'DELETE' });
+        const res = await fetch(`http://localhost:3000/api/stages/${id}`, { 
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
         if (res.ok) { showMessage("Excluído.", "success"); fetchStages(); resetForm(); }
     } catch (error) { showMessage("Erro.", "error"); } finally { setLoading(false); }
   };
@@ -143,8 +165,11 @@ const AdminDashboard = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-        const response = await fetch('http://localhost:3000/api/users');
-        setUsersList(await response.json());
+        const res = await fetch('http://localhost:3000/api/users', {
+            headers: getAuthHeaders()
+        });
+        if(res.ok) setUsersList(await res.json());
+        else if(res.status === 403) handleLogout();
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
   const handleEditUserClick = (user) => {
@@ -155,13 +180,23 @@ const AdminDashboard = () => {
   const handleSaveUser = async (e) => {
       e.preventDefault(); setLoading(true);
       try {
-          const res = await fetch(`http://localhost:3000/api/users/${userForm.id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(userForm)});
+          const res = await fetch(`http://localhost:3000/api/users/${userForm.id}`, { 
+              method: 'PUT', 
+              headers: getAuthHeaders(), 
+              body: JSON.stringify(userForm)
+          });
           if (res.ok) { showMessage("Usuário atualizado!", "success"); setEditingUser(null); fetchUsers(); }
       } catch (error) { showMessage("Erro.", "error"); } finally { setLoading(false); }
   };
   const handleDeleteUser = async (id) => {
       if(!window.confirm("Tem certeza?")) return;
-      try { await fetch(`http://localhost:3000/api/users/${id}`, { method: 'DELETE' }); showMessage("Removido.", "success"); fetchUsers(); } catch (e) { showMessage("Erro", "error"); }
+      try { 
+          await fetch(`http://localhost:3000/api/users/${id}`, { 
+              method: 'DELETE',
+              headers: getAuthHeaders()
+          }); 
+          showMessage("Removido.", "success"); fetchUsers(); 
+      } catch (e) { showMessage("Erro", "error"); }
   };
 
   // --- PONTUAÇÃO ---
@@ -179,7 +214,11 @@ const AdminDashboard = () => {
     const file = event.target.files[0]; if (!file) return;
     const uploadData = new FormData(); uploadData.append('file', file); setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/stages/${selectedStage.id}/upload/${encodeURIComponent(selectedCategory)}`, { method: 'POST', body: uploadData });
+      const res = await fetch(`http://localhost:3000/api/stages/${selectedStage.id}/upload/${encodeURIComponent(selectedCategory)}`, { 
+          method: 'POST', 
+          headers: getAuthHeaders(false),
+          body: uploadData 
+      });
       if (res.ok) { showMessage("Resultados atualizados!", "success"); fetchCategoryStatus(selectedStage.id); const d = await res.json(); if(d.data) { setCategoryResults(d.data); setIsReplacing(false); } else { fetchCategoryResults(selectedStage.id, selectedCategory); } }
       else showMessage("Erro no upload", "error");
     } catch (e) { showMessage("Falha envio", "error"); } finally { setLoading(false); event.target.value = null; }
@@ -189,7 +228,9 @@ const AdminDashboard = () => {
   const fetchRegistrations = async (stageId) => {
       setLoading(true);
       try {
-          const res = await fetch(`http://localhost:3000/api/registrations/stage/${stageId}`);
+          const res = await fetch(`http://localhost:3000/api/registrations/stage/${stageId}`, {
+              headers: getAuthHeaders()
+          });
           setRegistrationsList(await res.json());
       } catch (e) { console.error(e); } finally { setLoading(false); }
   };
@@ -198,7 +239,9 @@ const AdminDashboard = () => {
       const newStatus = reg.status === 'paid' ? 'pending' : 'paid';
       try {
           const res = await fetch(`http://localhost:3000/api/registrations/${reg.id}/status`, {
-              method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus })
+              method: 'PUT', 
+              headers: getAuthHeaders(), 
+              body: JSON.stringify({ status: newStatus })
           });
           if (res.ok) {
               setRegistrationsList(prev => prev.map(item => item.id === reg.id ? { ...item, status: newStatus } : item));
@@ -207,11 +250,39 @@ const AdminDashboard = () => {
       } catch (error) { showMessage("Erro ao atualizar status", "error"); }
   };
 
+  const handleGeneratePDF = () => {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text(selectedStageReg.name, 14, 20);
+      doc.setFontSize(12);
+      doc.text(`Lista de Inscritos - Gerado em ${new Date().toLocaleDateString()}`, 14, 28);
+      const tableColumn = ["Piloto", "Moto", "Categorias", "Status", "Valor"];
+      const tableRows = [];
+      // Filtra a lista baseado na busca antes de gerar o PDF
+      const filteredRegs = registrationsList.filter(reg => 
+        reg.pilot_name.toLowerCase().includes(regSearch.toLowerCase()) || 
+        (reg.pilot_number && reg.pilot_number.includes(regSearch))
+      );
+
+      filteredRegs.forEach(reg => {
+          const regData = [
+              reg.pilot_name,
+              reg.pilot_number || '-',
+              reg.categories,
+              reg.status === 'paid' ? 'PAGO' : 'PENDENTE',
+              `R$ ${reg.total_price}`
+          ];
+          tableRows.push(regData);
+      });
+      doc.autoTable({ head: [tableColumn], body: tableRows, startY: 35, theme: 'grid', styles: { fontSize: 10 }, headStyles: { fillColor: [220, 0, 0] } });
+      doc.save(`Lista_Inscritos_${selectedStageReg.name}.pdf`);
+  };
+
   const totalInscritos = registrationsList.length;
   const totalReceita = registrationsList.reduce((acc, curr) => acc + (curr.total_price || 0), 0);
   const totalPendente = registrationsList.filter(r => r.status === 'pending').reduce((acc, curr) => acc + (curr.total_price || 0), 0);
 
-  // --- PLANOS E LOTES ---
+  // --- PLANOS E SETTINGS ---
   const fetchPlans = async () => {
       setLoading(true);
       try {
@@ -222,11 +293,14 @@ const AdminDashboard = () => {
       } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
-  const fetchBatchName = async () => {
+  const fetchSettings = async () => {
       try {
-          const res = await fetch('http://localhost:3000/api/settings/current_batch');
-          const data = await res.json();
-          setBatchName(data.value || '');
+          const batchRes = await fetch('http://localhost:3000/api/settings/current_batch');
+          const batchData = await batchRes.json();
+          setBatchName(batchData.value || '');
+          const pixRes = await fetch('http://localhost:3000/api/settings/pix_key');
+          const pixData = await pixRes.json();
+          setPixKey(pixData.value || '');
       } catch (error) { console.error(error); }
   };
 
@@ -235,34 +309,35 @@ const AdminDashboard = () => {
   };
 
   const handleLaunchNewLot = async () => {
-      if(!window.confirm("Tem certeza que deseja LANÇAR ESTE NOVO LOTE?\n\nIsso atualizará os preços e o nome do lote no site.")) return;
-      
+      if(!window.confirm("Tem certeza que deseja SALVAR AS ALTERAÇÕES?")) return;
       setLoading(true);
       try {
           const updatePromises = localPlans.map(plan => 
               fetch(`http://localhost:3000/api/plans/${plan.id}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ price: plan.price })
+                  method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ price: plan.price })
               })
           );
-          
-          updatePromises.push(
-              fetch(`http://localhost:3000/api/settings/current_batch`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ value: batchName })
-              })
-          );
+          updatePromises.push(fetch(`http://localhost:3000/api/settings/current_batch`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ value: batchName }) }));
+          updatePromises.push(fetch(`http://localhost:3000/api/settings/pix_key`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ value: pixKey }) }));
 
           await Promise.all(updatePromises);
-          showMessage("Novo lote e preços lançados!", "success");
+          showMessage("Configurações salvas com sucesso!", "success");
           fetchPlans();
-      } catch (error) {
-          showMessage("Erro ao lançar lote.", "error");
-      } finally {
-          setLoading(false);
-      }
+      } catch (error) { showMessage("Erro ao salvar.", "error"); } finally { setLoading(false); }
+  };
+
+  // --- BACKUP ---
+  const handleDownloadBackup = async () => {
+      try {
+          const res = await fetch('http://localhost:3000/api/admin/backup', { headers: getAuthHeaders(false) });
+          if(res.ok) {
+              const blob = await res.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = `backup_tamura_${new Date().toISOString().slice(0,10)}.sqlite`;
+              document.body.appendChild(a); a.click(); a.remove();
+              showMessage("Backup baixado com sucesso!", "success");
+          } else { showMessage("Erro ao baixar backup.", "error"); }
+      } catch(e) { showMessage("Erro de conexão.", "error"); }
   };
 
   // =====================================================
@@ -289,6 +364,7 @@ const AdminDashboard = () => {
                 <button onClick={() => setActiveTab('users')} className={`px-4 py-1.5 rounded text-sm font-bold uppercase whitespace-nowrap transition ${activeTab === 'users' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}>Pilotos</button>
             </div>
             <div className="h-6 w-px bg-neutral-700 hidden xl:block"></div>
+            <button onClick={handleDownloadBackup} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 px-3 py-2 border border-blue-900 rounded hover:bg-blue-900/20 transition text-xs font-bold uppercase"><Download size={16} /> Backup</button>
             <button onClick={handleLogout} className="flex items-center gap-2 text-gray-400 hover:text-red-500 px-3 py-2 rounded transition text-xs font-bold uppercase tracking-widest whitespace-nowrap">
                 <LogOut size={16} /> Sair
             </button>
@@ -335,7 +411,6 @@ const AdminDashboard = () => {
                         </div>
                         <div>
                             <div className="font-bold text-white">{stage.name}</div>
-                            {/* Correção de Data */}
                             <div className="text-xs text-gray-500 flex items-center gap-2 mt-1"><MapPin size={12}/> {stage.location} | <Calendar size={12}/> {new Date(stage.date + 'T12:00:00').toLocaleDateString('pt-BR')}</div>
                         </div>
                     </div>
@@ -350,7 +425,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* --- ABA PONTUAÇÃO (SEM VEL. MÉDIA) --- */}
+        {/* --- ABA PONTUAÇÃO --- */}
         {activeTab === 'scores' && (
           <div>
             {!selectedStage && (
@@ -400,7 +475,6 @@ const AdminDashboard = () => {
                                 <th className="p-4 text-center">Voltas</th>
                                 <th className="p-4 hidden md:table-cell">Tempo Total</th>
                                 <th className="p-4 hidden md:table-cell">Dif. Líder</th>
-                                {/* REMOVIDO: Vel. Média */}
                                 <th className="p-4 hidden md:table-cell">Melhor Volta</th>
                                 <th className="p-4 text-center text-white bg-red-900/20 w-24">PTS</th>
                             </tr>
@@ -414,7 +488,6 @@ const AdminDashboard = () => {
                                 <td className="p-4 text-center text-gray-400">{row.laps}</td>
                                 <td className="p-4 text-xs text-gray-400 hidden md:table-cell">{row.total_time}</td>
                                 <td className="p-4 text-xs text-gray-500 hidden md:table-cell">{row.diff_first}</td>
-                                {/* REMOVIDO: Vel. Média */}
                                 <td className="p-4 text-green-400 text-xs hidden md:table-cell">{row.best_lap}</td>
                                 <td className="p-4 text-center font-black text-red-500 bg-red-900/10">{row.points}</td>
                             </tr>
@@ -455,19 +528,39 @@ const AdminDashboard = () => {
                  </div>
              ) : (
                  <div>
-                    <button onClick={() => setSelectedStageReg(null)} className="mb-6 text-sm text-gray-400 hover:text-white flex items-center gap-2"><ArrowLeft size={16}/> Voltar para Etapas</button>
+                    <div className="flex justify-between items-center mb-6">
+                        <button onClick={() => setSelectedStageReg(null)} className="text-sm text-gray-400 hover:text-white flex items-center gap-2"><ArrowLeft size={16}/> Voltar</button>
+                        {/* NOVO: BUSCA DE INSCRIÇÃO */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-2.5 text-gray-500" size={16} />
+                            <input 
+                                type="text" 
+                                placeholder="Buscar Piloto..." 
+                                className="bg-neutral-900 border border-neutral-600 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:border-green-500 outline-none"
+                                value={regSearch}
+                                onChange={(e) => setRegSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700 shadow-lg flex items-center justify-between"><div><p className="text-gray-500 text-xs font-bold uppercase">Total Inscritos</p><p className="text-3xl font-black text-white">{totalInscritos}</p></div><Users size={32} className="text-blue-500 opacity-50"/></div>
                         <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700 shadow-lg flex items-center justify-between"><div><p className="text-gray-500 text-xs font-bold uppercase">Receita Estimada</p><p className="text-3xl font-black text-white">R$ {totalReceita},00</p></div><DollarSign size={32} className="text-green-500 opacity-50"/></div>
                         <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700 shadow-lg flex items-center justify-between"><div><p className="text-gray-500 text-xs font-bold uppercase">A Receber (Pendente)</p><p className="text-3xl font-black text-yellow-500">R$ {totalPendente},00</p></div><Wallet size={32} className="text-yellow-500 opacity-50"/></div>
                     </div>
                     <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden shadow-2xl">
-                        <div className="p-6 border-b border-neutral-700 bg-neutral-900"><h2 className="text-2xl font-black italic uppercase text-white">{selectedStageReg.name}</h2><p className="text-gray-500 text-sm">Lista de Pilotos Inscritos</p></div>
+                        <div className="p-6 border-b border-neutral-700 bg-neutral-900 flex justify-between items-center">
+                            <div><h2 className="text-2xl font-black italic uppercase text-white">{selectedStageReg.name}</h2><p className="text-gray-500 text-sm">Lista de Pilotos Inscritos</p></div>
+                            <button onClick={handleGeneratePDF} className="bg-white text-black hover:bg-gray-200 px-4 py-2 rounded font-bold flex items-center gap-2 shadow-lg transition-all"><FileText size={18} /> Imprimir Lista (PDF)</button>
+                        </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead><tr className="bg-neutral-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-neutral-700"><th className="p-4">Piloto</th><th className="p-4">Contato</th><th className="p-4 text-center">Nº Moto</th><th className="p-4">Categorias</th><th className="p-4">Pacote</th><th className="p-4 text-right">Valor</th><th className="p-4 text-center">Pagamento</th></tr></thead>
                                 <tbody className="divide-y divide-neutral-700 text-sm text-gray-300">
-                                    {registrationsList.length > 0 ? (registrationsList.map(reg => (
+                                    {registrationsList.length > 0 ? (
+                                        // FILTRO APLICADO AQUI
+                                        registrationsList
+                                        .filter(reg => reg.pilot_name.toLowerCase().includes(regSearch.toLowerCase()) || (reg.pilot_number && reg.pilot_number.includes(regSearch)))
+                                        .map(reg => (
                                             <tr key={reg.id} className="hover:bg-neutral-700/30 transition">
                                                 <td className="p-4 font-bold text-white">{reg.pilot_name}<div className="text-xs text-gray-500 font-normal">{reg.cpf}</div></td>
                                                 <td className="p-4 flex items-center gap-2">{reg.phone}{reg.phone && (<a href={`https://wa.me/55${reg.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-green-500 hover:text-green-400 p-1 bg-green-900/20 rounded" title="WhatsApp"><MessageCircle size={16} /></a>)}</td>
@@ -492,10 +585,14 @@ const AdminDashboard = () => {
             <div className="animate-fade-in">
                 <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden shadow-2xl">
                     <div className="p-6 border-b border-neutral-700 bg-neutral-900 flex justify-between items-center">
-                        <div><h2 className="text-2xl font-black italic uppercase text-white flex items-center gap-2"><Tag className="text-yellow-500" /> Gestão de Lotes</h2><p className="text-gray-500 text-sm mt-1">Edite o nome e valores, depois lance o novo lote.</p></div>
+                        <div><h2 className="text-2xl font-black italic uppercase text-white flex items-center gap-2"><Tag className="text-yellow-500" /> Gestão de Lotes e Pagamento</h2><p className="text-gray-500 text-sm mt-1">Edite o lote, os valores e a chave PIX.</p></div>
                     </div>
-                    <div className="px-6 pt-6"><label className="text-xs text-yellow-500 font-bold uppercase">Nome do Lote Atual</label><div className="flex gap-2 mt-1"><input className="w-full bg-neutral-900 border border-yellow-600/50 rounded p-3 text-white font-bold text-lg outline-none focus:border-yellow-500" placeholder="Ex: 1º Lote - Promocional" value={batchName} onChange={(e) => setBatchName(e.target.value)} /></div></div>
-                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-neutral-700 pb-8 mb-6">
+                        <div><label className="text-xs text-yellow-500 font-bold uppercase">Nome do Lote Atual</label><input className="w-full bg-neutral-900 border border-yellow-600/50 rounded p-3 text-white font-bold text-lg outline-none focus:border-yellow-500 mt-2" placeholder="Ex: 1º Lote - Promocional" value={batchName} onChange={(e) => setBatchName(e.target.value)} /></div>
+                        <div><label className="text-xs text-green-500 font-bold uppercase flex items-center gap-2"><DollarSign size={14}/> Chave PIX para Recebimento</label><input className="w-full bg-neutral-900 border border-green-600/50 rounded p-3 text-white font-mono text-lg outline-none focus:border-green-500 mt-2" placeholder="Email, CPF ou Telefone" value={pixKey} onChange={(e) => setPixKey(e.target.value)} /></div>
+                    </div>
+                    <div className="px-6 pb-2"><h3 className="text-lg font-bold text-white mb-4">Tabela de Preços</h3></div>
+                    <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {localPlans.map(plan => (
                             <div key={plan.id} className="bg-[#111] border border-gray-800 rounded-xl p-6 relative hover:border-yellow-600/50 transition-all">
                                 <div className="mb-4 flex justify-between items-start">
@@ -508,7 +605,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="p-6 bg-neutral-900 border-t border-neutral-700 flex justify-end items-center gap-4">
                         <div className="text-xs text-gray-500 hidden md:block"><span className="text-yellow-500 font-bold">Atenção:</span> A alteração será aplicada imediatamente.</div>
-                        <button onClick={handleLaunchNewLot} disabled={loading} className="bg-yellow-600 hover:bg-yellow-500 text-white px-8 py-4 rounded-lg font-black uppercase tracking-widest shadow-lg hover:shadow-yellow-900/20 transition-all flex items-center gap-3 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Processando...' : 'Lançar Novo Lote'}{!loading && <Save size={20} strokeWidth={3} />}</button>
+                        <button onClick={handleLaunchNewLot} disabled={loading} className="bg-yellow-600 hover:bg-yellow-500 text-white px-8 py-4 rounded-lg font-black uppercase tracking-widest shadow-lg hover:shadow-yellow-900/20 transition-all flex items-center gap-3 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Processando...' : 'Salvar Tudo'}{!loading && <Save size={20} strokeWidth={3} />}</button>
                     </div>
                 </div>
             </div>
@@ -534,13 +631,44 @@ const AdminDashboard = () => {
              <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden shadow-2xl">
                 <div className="p-6 border-b border-neutral-700 bg-neutral-900 flex justify-between items-center">
                    <h2 className="text-2xl font-black italic uppercase text-white flex items-center gap-2"><Users className="text-blue-500" /> Gestão de Pilotos</h2>
-                   <div className="text-sm text-gray-500 font-bold bg-neutral-800 px-3 py-1 rounded-full border border-neutral-700">Total: {usersList.length}</div>
+                   <div className="flex items-center gap-4">
+                       {/* NOVO: BUSCA DE PILOTO */}
+                       <div className="relative hidden md:block">
+                            <Search className="absolute left-3 top-2.5 text-gray-500" size={16} />
+                            <input 
+                                type="text" 
+                                placeholder="Buscar Piloto..." 
+                                className="bg-neutral-800 border border-neutral-600 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:border-blue-500 outline-none w-64"
+                                value={userSearch}
+                                onChange={(e) => setUserSearch(e.target.value)}
+                            />
+                       </div>
+                       <div className="text-sm text-gray-500 font-bold bg-neutral-800 px-3 py-1 rounded-full border border-neutral-700">Total: {usersList.length}</div>
+                   </div>
                 </div>
                 <div className="overflow-x-auto">
                    <table className="w-full text-left border-collapse">
                       <thead><tr className="bg-neutral-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-neutral-700"><th className="p-4">Piloto</th><th className="p-4 text-center">Nº Moto</th><th className="p-4 text-center text-blue-400">Chip ID</th><th className="p-4 hidden md:table-cell">CPF</th><th className="p-4 text-center">Função</th><th className="p-4 text-right">Ações</th></tr></thead>
                       <tbody className="divide-y divide-neutral-700 text-sm text-gray-300">
-                         {usersList.length > 0 ? (usersList.map((user) => (<tr key={user.id} className={`hover:bg-neutral-700/30 transition group ${editingUser === user.id ? 'bg-yellow-900/10' : ''}`}><td className="p-4 font-bold text-white capitalize">{user.name}<div className="text-xs text-gray-500 font-normal lowercase">{user.email}</div></td><td className="p-4 text-center"><span className="font-mono font-bold text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/20">{user.bike_number||'-'}</span></td><td className="p-4 text-center">{user.chip_id?(<span className="font-mono text-xs text-blue-400 border border-blue-900 bg-blue-900/20 px-2 py-1 rounded">{user.chip_id}</span>):(<span className="text-xs text-gray-600 italic">--</span>)}</td><td className="p-4 text-gray-500 font-mono text-xs hidden md:table-cell">{user.cpf}</td><td className="p-4 text-center">{user.role==='admin'?(<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-900/20 text-red-500 border border-red-900/50">ADMIN</span>):(<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-700 text-gray-400">PILOTO</span>)}</td><td className="p-4 text-right flex justify-end gap-2"><button onClick={() => handleEditUserClick(user)} className="p-2 rounded text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10"><Edit3 size={16}/></button><button onClick={() => handleDeleteUser(user.id)} className="p-2 rounded text-gray-400 hover:text-red-500 hover:bg-red-500/10"><Trash2 size={16}/></button></td></tr>))) : (<tr><td colSpan="6" className="p-12 text-center text-gray-500 italic">{loading?"...":"Nenhum piloto."}</td></tr>)}
+                         {usersList.length > 0 ? (
+                             // FILTRO APLICADO AQUI
+                             usersList
+                             .filter(user => 
+                                user.name.toLowerCase().includes(userSearch.toLowerCase()) || 
+                                user.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+                                (user.bike_number && user.bike_number.includes(userSearch))
+                             )
+                             .map((user) => (
+                                <tr key={user.id} className={`hover:bg-neutral-700/30 transition group ${editingUser === user.id ? 'bg-yellow-900/10' : ''}`}>
+                                    <td className="p-4 font-bold text-white capitalize">{user.name}<div className="text-xs text-gray-500 font-normal lowercase">{user.email}</div></td>
+                                    <td className="p-4 text-center"><span className="font-mono font-bold text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/20">{user.bike_number||'-'}</span></td>
+                                    <td className="p-4 text-center">{user.chip_id?(<span className="font-mono text-xs text-blue-400 border border-blue-900 bg-blue-900/20 px-2 py-1 rounded">{user.chip_id}</span>):(<span className="text-xs text-gray-600 italic">--</span>)}</td>
+                                    <td className="p-4 text-gray-500 font-mono text-xs hidden md:table-cell">{user.cpf}</td>
+                                    <td className="p-4 text-center">{user.role==='admin'?(<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-900/20 text-red-500 border border-red-900/50">ADMIN</span>):(<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-700 text-gray-400">PILOTO</span>)}</td>
+                                    <td className="p-4 text-right flex justify-end gap-2"><button onClick={() => handleEditUserClick(user)} className="p-2 rounded text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10"><Edit3 size={16}/></button><button onClick={() => handleDeleteUser(user.id)} className="p-2 rounded text-gray-400 hover:text-red-500 hover:bg-red-500/10"><Trash2 size={16}/></button></td>
+                                </tr>
+                             ))
+                         ) : (<tr><td colSpan="6" className="p-12 text-center text-gray-500 italic">{loading?"...":"Nenhum piloto."}</td></tr>)}
                       </tbody>
                    </table>
                 </div>
