@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "./Navbar";
 import EventCard from "./EventCard";
-// Removido: import Standings from "./Standings"; 
 import Footer from "./Footer";
-import { Timer, Award, Users, CheckCircle, Phone, Mail, MapPin, Clock, Instagram, Facebook } from "lucide-react";
+import { Timer, Award, Users, CheckCircle, Phone, Mail, MapPin } from "lucide-react";
 
 const Home = () => {
   const [events, setEvents] = useState([]);
@@ -24,27 +23,29 @@ const Home = () => {
       {/* =========================================
           SEÇÃO 1: HERO (BANNER PRINCIPAL)
          ========================================= */}
-      <div className="relative bg-[#0a0a0a] border-b-4 border-[#D80000] overflow-hidden">
+      <div className="relative bg-[#0a0a0a] border-b-4 border-[#D80000] overflow-hidden h-[600px] flex items-center">
         <div className="absolute inset-0 z-0 opacity-40">
+           {/* CORREÇÃO: Caminho absoluto para a pasta public */}
            <img 
-            src="../../public/bgLandPage.jpeg" 
+            src="/bgLandPage.jpeg" 
             className="w-full h-full object-cover grayscale" 
             alt="Fundo Motocross"
+            onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=2070&auto=format&fit=crop"; }} // Fallback se a imagem não existir
            />
         </div>
         <div className="absolute inset-0 z-10 bg-gradient-to-t from-[#0a0a0a] via-transparent to-[#0a0a0a]/80"></div>
         
-        <div className="relative z-20 container mx-auto px-4 py-24 md:py-32 text-center">
-          <h2 className="text-5xl md:text-7xl font-black italic tracking-tighter uppercase mb-6 drop-shadow-lg">
+        <div className="relative z-20 container mx-auto px-4 text-center mt-10">
+          <h2 className="text-5xl md:text-7xl font-black italic tracking-tighter uppercase mb-6 drop-shadow-lg animate-fade-in-up">
             Acelere para a <span className="text-[#D80000]">Glória</span>
           </h2>
-          <p className="text-gray-200 text-lg md:text-xl max-w-2xl mx-auto mb-10 font-medium shadow-black drop-shadow-md">
+          <p className="text-gray-200 text-lg md:text-xl max-w-2xl mx-auto mb-10 font-medium shadow-black drop-shadow-md animate-fade-in-up delay-100">
             O sistema oficial de inscrições da Tamura Eventos. 
             Garanta seu gate nas melhores pistas de Velocross da região.
           </p>
           
           <Link to="/login">
-            <button className="bg-[#D80000] hover:bg-red-700 text-white px-8 py-4 rounded font-black uppercase text-lg tracking-widest transition-transform hover:-translate-y-1 shadow-[0_4px_0_rgb(100,0,0)] hover:shadow-[0_2px_0_rgb(100,0,0)] active:shadow-none active:translate-y-0">
+            <button className="bg-[#D80000] hover:bg-red-700 text-white px-8 py-4 rounded font-black uppercase text-lg tracking-widest transition-transform hover:-translate-y-1 shadow-[0_4px_0_rgb(100,0,0)] hover:shadow-[0_2px_0_rgb(100,0,0)] active:shadow-none active:translate-y-0 animate-bounce-slow">
               Quero Correr
             </button>
           </Link>
@@ -68,10 +69,12 @@ const Home = () => {
               <Link to={`/event/${event.id}/register`} key={event.id} className="block group">
                 <EventCard 
                   title={event.name}
-                  date={event.date}
+                  // Formata a data para ficar mais amigável
+                  date={new Date(event.date).toLocaleDateString('pt-BR')} 
                   location={event.location}
                   price="Inscrições Abertas" 
-                  image="/bgEvent.jpg" 
+                  // MELHORIA: Usa a imagem cadastrada no Admin ou uma padrão
+                  image={event.image_url ? `http://localhost:3000${event.image_url}` : "/bgEvent.jpg"} 
                 />
               </Link>
             ))}
@@ -173,7 +176,7 @@ const Home = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
                 {/* Card 1: WhatsApp */}
-                <a href="https://wa.me/5511947628294" target="_blank" className="bg-[#111] p-8 rounded-xl border border-gray-800 hover:border-[#D80000] group transition text-center flex flex-col items-center">
+                <a href="https://wa.me/5511947628294" target="_blank" rel="noreferrer" className="bg-[#111] p-8 rounded-xl border border-gray-800 hover:border-[#D80000] group transition text-center flex flex-col items-center">
                     <div className="bg-[#D80000]/10 p-4 rounded-full mb-4 group-hover:bg-[#D80000] transition">
                         <Phone className="w-8 h-8 text-[#D80000] group-hover:text-white" />
                     </div>
@@ -203,9 +206,6 @@ const Home = () => {
         </div>
       </div>
 
-      {/* =========================================
-          RODAPÉ
-         ========================================= */}
       <Footer />
     </div>
   );

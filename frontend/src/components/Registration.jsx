@@ -1,18 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Trophy, Bike, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Check, Trophy, Bike, DollarSign } from 'lucide-react';
 import Navbar from './Navbar';
 
-// --- PREÇOS (Configure conforme sua tabela oficial) ---
-const PRICING_PLANS = [
-  { id: 'fem',    name: 'Feminino',      price: 60,  limit: 1, description: 'Valor especial para categoria VX F' },
-  { id: 'trilha', name: 'Trilheiros',    price: 80,  limit: 1, description: 'Categoria exclusiva para motos de trilha' },
-  { id: 'p1',     name: '1 Categoria',   price: 120, limit: 1, description: 'Inscrição para uma única bateria' },
-  { id: 'p2',     name: '2 Categorias',  price: 200, limit: 2, description: 'Desconto para correr duas baterias' },
-  { id: 'p3',     name: '3 Categorias',  price: 260, limit: 3, description: 'Pacote promocional para 3 baterias' },
-];
-
-// --- LISTA DE CATEGORIAS OFICIAL ---
+// LISTA DE CATEGORIAS (Essa continua fixa pois define a regra do esporte)
 const CATEGORIES = [
   "50cc", "65cc", "Feminino", "Free Force One", "Importada Amador", 
   "Junior", "Nacional Amador", "Open Importada", "Open Nacional", 
@@ -22,48 +13,58 @@ const CATEGORIES = [
 ];
 
 const Registration = () => {
-  const { id } = useParams(); // ID da etapa vindo da URL
+  const { id } = useParams(); 
   const navigate = useNavigate();
   
   const [event, setEvent] = useState(null);
+  const [plans, setPlans] = useState([]); // ESTADO NOVO PARA PLANOS DINÂMICOS
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Recupera o usuário salvo no login
   const user = JSON.parse(localStorage.getItem('user'));
 
-  // 1. Carrega os dados da Etapa ao abrir a página
+  // 1. Carrega Dados Iniciais (Planos e Etapa)
   useEffect(() => {
+    if (!user) {
+        alert("Você precisa estar logado para realizar a inscrição.");
+        navigate('/login');
+        return;
+    }
+
+    // Busca Etapas
     fetch('http://localhost:3000/api/stages')
       .then(res => res.json())
       .then(stages => {
-        // Encontra a etapa correta pelo ID
         const currentStage = stages.find(s => s.id == id);
         if (currentStage) {
           setEvent(currentStage);
         } else {
           alert("Evento não encontrado!");
-          navigate('/');
+          navigate('/dashboard');
         }
       })
       .catch(err => console.error("Erro ao carregar etapas:", err));
-  }, [id, navigate]);
 
-  // 2. Lógica de Seleção de Categorias (Respeitando o limite do plano)
+    // Busca Planos Dinâmicos (Preços)
+    fetch('http://localhost:3000/api/plans')
+      .then(res => res.json())
+      .then(data => setPlans(data))
+      .catch(err => console.error("Erro ao carregar planos:", err));
+
+  }, [id, navigate, user]);
+
+  // 2. Lógica de Seleção de Categorias
   const toggleCategory = (category) => {
     if (selectedCategories.includes(category)) {
-      // Se já está selecionada, remove
       setSelectedCategories(selectedCategories.filter(c => c !== category));
     } else {
-      // Se não selecionou plano ainda
       if (!selectedPlan) return alert("Selecione um pacote de preço primeiro!");
       
-      // Verifica limite
-      if (selectedPlan.limit !== 99 && selectedCategories.length >= selectedPlan.limit) {
-        return alert(`O plano "${selectedPlan.name}" permite apenas ${selectedPlan.limit} categorias.`);
+      // Usa 'limit_cat' vindo do banco
+      if (selectedPlan.limit_cat !== 99 && selectedCategories.length >= selectedPlan.limit_cat) {
+        return alert(`O plano "${selectedPlan.name}" permite apenas ${selectedPlan.limit_cat} categorias.`);
       }
-      // Adiciona
       setSelectedCategories([...selectedCategories, category]);
     }
   };
@@ -71,13 +72,10 @@ const Registration = () => {
   // 3. Lógica de Seleção de Plano
   const handleSelectPlan = (plan) => {
     setSelectedPlan(plan);
-    // Se mudar para um plano menor, limpa as categorias para evitar erro
-    if (selectedCategories.length > plan.limit) {
-      setSelectedCategories([]);
-    }
+    setSelectedCategories([]); 
   };
 
-  // 4. FINALIZAR INSCRIÇÃO (Envia para o Backend)
+  // 4. Finalizar Inscrição
   const handleFinishRegistration = async () => {
     if (!selectedPlan || selectedCategories.length === 0) return;
     if (!user) return alert("Você precisa estar logado!");
@@ -90,8 +88,8 @@ const Registration = () => {
       pilot_number: user.bike_number || '00',
       stage_id: id,
       plan_name: selectedPlan.name,
-      categories: selectedCategories, // O backend vai converter array para string
-      total_price: selectedPlan.price
+      categories: selectedCategories,
+      total_price: selectedPlan.price // Usa o preço do banco
     };
 
     try {
@@ -105,7 +103,7 @@ const Registration = () => {
 
       if (response.ok) {
         alert(`Inscrição Realizada com Sucesso!\nValor a Pagar: R$ ${selectedPlan.price},00`);
-        navigate('/'); // Volta para o Dashboard do Piloto
+        navigate('/dashboard'); 
       } else {
         alert("Erro: " + result.error);
       }
@@ -117,7 +115,7 @@ const Registration = () => {
     }
   };
 
-  if (!event) return <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-white">Carregando evento...</div>;
+  if (!event || !user || plans.length === 0) return <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-white">Carregando...</div>;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-[#D80000] selection:text-white pb-40">
@@ -125,12 +123,10 @@ const Registration = () => {
 
       <div className="max-w-5xl mx-auto p-6 pt-12">
         
-        {/* Botão Voltar */}
-        <button onClick={() => navigate(-1)} className="flex items-center text-gray-400 hover:text-white mb-8 transition">
+        <button onClick={() => navigate('/dashboard')} className="flex items-center text-gray-400 hover:text-white mb-8 transition">
           <ArrowLeft size={20} className="mr-2"/> Cancelar Inscrição
         </button>
         
-        {/* Cabeçalho do Evento */}
         <div className="flex flex-col md:flex-row justify-between items-end border-b border-gray-800 pb-6 mb-10 gap-4">
           <div>
             <h1 className="text-4xl font-black italic uppercase tracking-tighter text-white">
@@ -151,7 +147,7 @@ const Registration = () => {
           </div>
         </div>
 
-        {/* SEÇÃO 1: ESCOLHA O PLANO */}
+        {/* SEÇÃO 1: ESCOLHA O PLANO (PREÇOS DINÂMICOS) */}
         <section className="mb-12">
           <h2 className="text-xl font-bold mb-4 text-gray-200 flex items-center gap-2">
             <span className="bg-[#D80000] w-6 h-6 rounded text-xs flex items-center justify-center text-black font-bold">1</span>
@@ -159,7 +155,7 @@ const Registration = () => {
           </h2>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {PRICING_PLANS.map((plan) => (
+            {plans.map((plan) => (
               <button 
                 key={plan.id}
                 onClick={() => handleSelectPlan(plan)}
@@ -191,18 +187,22 @@ const Registration = () => {
                 Selecione as Categorias
               </h2>
               
-              {/* Contador de Categorias */}
               <span className={`text-xs font-bold px-3 py-1 rounded border ${
-                selectedCategories.length === selectedPlan.limit 
+                selectedCategories.length === selectedPlan.limit_cat 
                 ? 'bg-green-900/30 text-green-400 border-green-600' 
                 : 'bg-gray-800 text-gray-300 border-gray-700'
               }`}>
-                {selectedCategories.length} de {selectedPlan.limit} selecionadas
+                {selectedCategories.length} de {selectedPlan.limit_cat === 99 ? 'Todas' : selectedPlan.limit_cat} selecionadas
               </span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {CATEGORIES.map((cat) => {
+                // Lógica de Filtro (Baseada no que vem do banco)
+                if (selectedPlan.allowed && !selectedPlan.allowed.includes(cat)) {
+                    return null;
+                }
+
                 const isSelected = selectedCategories.includes(cat);
                 return (
                   <button
@@ -226,7 +226,7 @@ const Registration = () => {
 
       </div>
 
-      {/* BARRA FLUTUANTE DE TOTAL (FIXA NO RODAPÉ) */}
+      {/* BARRA FLUTUANTE DE TOTAL */}
       <div className="fixed bottom-0 left-0 w-full bg-[#0f0f0f] border-t border-gray-800 p-4 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           

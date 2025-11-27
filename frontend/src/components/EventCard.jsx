@@ -1,17 +1,21 @@
+import React from 'react';
+
 const EventCard = ({ title, date, location, price, image }) => {
   return (
     <div className="bg-[#1a1a1a] rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-800 hover:border-[#D80000] group">
       
       {/* 1. Imagem do Evento */}
       <div className="relative h-48 overflow-hidden">
+        {/* CORREÇÃO: Usa a prop 'image' dinâmica em vez do caminho fixo */}
         <img 
-          src={"../../public/imagemEtapas.jpg"} 
+          src={image} 
           alt={title} 
           className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
         />
         {/* Etiqueta de Preço flutuante */}
+        {/* CORREÇÃO: Removeu o 'R$' fixo para aceitar textos como 'Inscrições Abertas' */}
         <div className="absolute top-0 right-0 bg-[#D80000] text-white font-bold px-3 py-1 rounded-bl-lg">
-          R$ {price}
+          {price}
         </div>
       </div>
 
