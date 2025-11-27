@@ -4,7 +4,7 @@ import {
   LogOut, Calendar, MapPin, Upload, Plus, Edit3, AlertCircle, CheckCircle, 
   Check, ArrowLeft, Trash2, RefreshCw, X, ImageIcon, Search, Users, 
   Shield, Bike, ClipboardList, DollarSign, Wallet, MessageCircle, Tag, Save, Layers, FileText, Download
-} from 'lucide-react'; // ADICIONADO: Download
+} from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -30,7 +30,7 @@ const AdminDashboard = () => {
 
   // --- ESTADOS DE USUÁRIOS ---
   const [usersList, setUsersList] = useState([]);
-  const [userSearch, setUserSearch] = useState(''); // NOVO: Busca de Usuário
+  const [userSearch, setUserSearch] = useState(''); 
   const [editingUser, setEditingUser] = useState(null); 
   const [userForm, setUserForm] = useState({ 
       id: null, name: '', email: '', phone: '', bike_number: '', chip_id: '', role: 'user' 
@@ -46,9 +46,10 @@ const AdminDashboard = () => {
   // --- ESTADOS DE INSCRIÇÕES ---
   const [selectedStageReg, setSelectedStageReg] = useState(null); 
   const [registrationsList, setRegistrationsList] = useState([]); 
-  const [regSearch, setRegSearch] = useState(''); // NOVO: Busca de Inscrição
+  const [regSearch, setRegSearch] = useState(''); 
 
-  // --- ESTADOS DE PLANOS E CONFIGURAÇÕES ---
+  // --- ESTADOS DE PLANOS E CONFIGURAÇÕES (ALTERADO) ---
+  const [selectedStagePlan, setSelectedStagePlan] = useState(null); // Para selecionar qual etapa editar
   const [plans, setPlans] = useState([]); 
   const [localPlans, setLocalPlans] = useState([]); 
   const [batchName, setBatchName] = useState(''); 
@@ -80,16 +81,26 @@ const AdminDashboard = () => {
   // Carregamentos Iniciais
   useEffect(() => { fetchStages(); }, []);
   useEffect(() => { if (activeTab === 'users') fetchUsers(); }, [activeTab]);
+  
+  // NOVO: Carrega PIX Global ao entrar na aba, mas não os planos ainda (espera selecionar etapa)
   useEffect(() => { 
       if (activeTab === 'plans') {
-          fetchPlans();
-          fetchSettings(); 
+          fetchGlobalSettings(); 
+          setSelectedStagePlan(null); // Reseta seleção ao entrar na aba
       } 
   }, [activeTab]);
   
+  // Efeitos condicionais
   useEffect(() => { if (selectedStage) fetchCategoryStatus(selectedStage.id); }, [selectedStage]);
   useEffect(() => { if (selectedStage && selectedCategory) fetchCategoryResults(selectedStage.id, selectedCategory); }, [selectedCategory]);
   useEffect(() => { if (selectedStageReg) fetchRegistrations(selectedStageReg.id); }, [selectedStageReg]);
+  
+  // NOVO: Carrega preços da etapa específica quando selecionada
+  useEffect(() => {
+      if (selectedStagePlan) {
+          fetchStagePrices(selectedStagePlan);
+      }
+  }, [selectedStagePlan]);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -258,7 +269,7 @@ const AdminDashboard = () => {
       doc.text(`Lista de Inscritos - Gerado em ${new Date().toLocaleDateString()}`, 14, 28);
       const tableColumn = ["Piloto", "Moto", "Categorias", "Status", "Valor"];
       const tableRows = [];
-      // Filtra a lista baseado na busca antes de gerar o PDF
+      
       const filteredRegs = registrationsList.filter(reg => 
         reg.pilot_name.toLowerCase().includes(regSearch.toLowerCase()) || 
         (reg.pilot_number && reg.pilot_number.includes(regSearch))
@@ -282,48 +293,68 @@ const AdminDashboard = () => {
   const totalReceita = registrationsList.reduce((acc, curr) => acc + (curr.total_price || 0), 0);
   const totalPendente = registrationsList.filter(r => r.status === 'pending').reduce((acc, curr) => acc + (curr.total_price || 0), 0);
 
-  // --- PLANOS E SETTINGS ---
-  const fetchPlans = async () => {
+  // --- PLANOS E LOTES POR ETAPA (LÓGICA NOVA) ---
+  
+  // 1. Busca configurações globais (PIX)
+  const fetchGlobalSettings = async () => {
+      try { 
+          const res = await fetch('http://localhost:3000/api/settings/pix_key'); 
+          const data = await res.json(); 
+          setPixKey(data.value || '');
+      } catch(e) { console.error(e); }
+  };
+
+  // 2. Busca preços da etapa selecionada
+  const fetchStagePrices = async (stageId) => {
       setLoading(true);
       try {
-          const res = await fetch('http://localhost:3000/api/plans');
+          const res = await fetch(`http://localhost:3000/api/stages/${stageId}/prices`);
           const data = await res.json();
-          setPlans(data);
-          setLocalPlans(data); 
-      } catch (error) { console.error(error); } finally { setLoading(false); }
+          setBatchName(data.batch_name); // Lote específico da etapa
+          setLocalPlans(data.plans);     // Preços específicos da etapa
+      } catch (error) { 
+          console.error(error); 
+          showMessage("Erro ao carregar preços.", "error");
+      } finally { 
+          setLoading(false); 
+      }
   };
 
-  const fetchSettings = async () => {
-      try {
-          const batchRes = await fetch('http://localhost:3000/api/settings/current_batch');
-          const batchData = await batchRes.json();
-          setBatchName(batchData.value || '');
-          const pixRes = await fetch('http://localhost:3000/api/settings/pix_key');
-          const pixData = await pixRes.json();
-          setPixKey(pixData.value || '');
-      } catch (error) { console.error(error); }
-  };
-
+  // 3. Atualiza preço no estado local
   const handleLocalPriceChange = (id, newPrice) => {
       setLocalPlans(prev => prev.map(p => p.id === id ? { ...p, price: parseFloat(newPrice) || 0 } : p));
   };
 
-  const handleLaunchNewLot = async () => {
-      if(!window.confirm("Tem certeza que deseja SALVAR AS ALTERAÇÕES?")) return;
+  // 4. Salva tudo (Preços da Etapa + Lote da Etapa + PIX Global)
+  const handleSaveStagePrices = async () => {
+      if (!selectedStagePlan) return;
+      if (!window.confirm("Tem certeza que deseja SALVAR para esta etapa?")) return;
+      
       setLoading(true);
       try {
-          const updatePromises = localPlans.map(plan => 
-              fetch(`http://localhost:3000/api/plans/${plan.id}`, {
-                  method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ price: plan.price })
+          // Salva configurações da etapa
+          await fetch(`http://localhost:3000/api/stages/${selectedStagePlan}/prices`, {
+              method: 'PUT',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ 
+                  batch_name: batchName,
+                  plans: localPlans 
               })
-          );
-          updatePromises.push(fetch(`http://localhost:3000/api/settings/current_batch`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ value: batchName }) }));
-          updatePromises.push(fetch(`http://localhost:3000/api/settings/pix_key`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ value: pixKey }) }));
+          });
 
-          await Promise.all(updatePromises);
-          showMessage("Configurações salvas com sucesso!", "success");
-          fetchPlans();
-      } catch (error) { showMessage("Erro ao salvar.", "error"); } finally { setLoading(false); }
+          // Salva PIX Global
+          await fetch(`http://localhost:3000/api/settings/pix_key`, {
+              method: 'PUT', 
+              headers: getAuthHeaders(), 
+              body: JSON.stringify({ value: pixKey })
+          });
+
+          showMessage("Preços e configurações salvos!", "success");
+      } catch (error) { 
+          showMessage("Erro ao salvar.", "error"); 
+      } finally { 
+          setLoading(false); 
+      }
   };
 
   // --- BACKUP ---
@@ -357,11 +388,11 @@ const AdminDashboard = () => {
           </div>
           <div className="flex items-center gap-4 overflow-x-auto max-w-full pb-2 xl:pb-0">
             <div className="flex bg-neutral-900 p-1 rounded-lg border border-neutral-700">
-                <button onClick={() => setActiveTab('events')} className={`px-4 py-1.5 rounded text-sm font-bold uppercase whitespace-nowrap transition ${activeTab === 'events' ? 'bg-neutral-700 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}>Eventos</button>
-                <button onClick={() => setActiveTab('scores')} className={`px-4 py-1.5 rounded text-sm font-bold uppercase whitespace-nowrap transition ${activeTab === 'scores' ? 'bg-red-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}>Pontuação</button>
-                <button onClick={() => setActiveTab('registrations')} className={`px-4 py-1.5 rounded text-sm font-bold uppercase whitespace-nowrap transition ${activeTab === 'registrations' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}>Inscrições</button>
-                <button onClick={() => setActiveTab('plans')} className={`px-4 py-1.5 rounded text-sm font-bold uppercase whitespace-nowrap transition ${activeTab === 'plans' ? 'bg-yellow-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}>Planos/Lotes</button>
-                <button onClick={() => setActiveTab('users')} className={`px-4 py-1.5 rounded text-sm font-bold uppercase whitespace-nowrap transition ${activeTab === 'users' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}>Pilotos</button>
+                {['events', 'scores', 'registrations', 'plans', 'users'].map(tab => (
+                    <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1.5 rounded text-sm font-bold uppercase transition ${activeTab === tab ? 'bg-neutral-700 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}>
+                        {tab === 'events' ? 'Eventos' : tab === 'scores' ? 'Pontuação' : tab === 'registrations' ? 'Inscrições' : tab === 'plans' ? 'Planos/Lotes' : 'Pilotos'}
+                    </button>
+                ))}
             </div>
             <div className="h-6 w-px bg-neutral-700 hidden xl:block"></div>
             <button onClick={handleDownloadBackup} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 px-3 py-2 border border-blue-900 rounded hover:bg-blue-900/20 transition text-xs font-bold uppercase"><Download size={16} /> Backup</button>
@@ -511,7 +542,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* --- ABA INSCRIÇÕES --- */}
+        {/* --- ABA INSCRIÇÕES (COM PDF E BUSCA) --- */}
         {activeTab === 'registrations' && (
           <div className="animate-fade-in">
              {!selectedStageReg ? (
@@ -530,13 +561,12 @@ const AdminDashboard = () => {
                  <div>
                     <div className="flex justify-between items-center mb-6">
                         <button onClick={() => setSelectedStageReg(null)} className="text-sm text-gray-400 hover:text-white flex items-center gap-2"><ArrowLeft size={16}/> Voltar</button>
-                        {/* NOVO: BUSCA DE INSCRIÇÃO */}
                         <div className="relative">
                             <Search className="absolute left-3 top-2.5 text-gray-500" size={16} />
                             <input 
                                 type="text" 
                                 placeholder="Buscar Piloto..." 
-                                className="bg-neutral-900 border border-neutral-600 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:border-green-500 outline-none"
+                                className="bg-neutral-900 border border-neutral-600 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:border-green-500 outline-none w-64"
                                 value={regSearch}
                                 onChange={(e) => setRegSearch(e.target.value)}
                             />
@@ -557,7 +587,6 @@ const AdminDashboard = () => {
                                 <thead><tr className="bg-neutral-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-neutral-700"><th className="p-4">Piloto</th><th className="p-4">Contato</th><th className="p-4 text-center">Nº Moto</th><th className="p-4">Categorias</th><th className="p-4">Pacote</th><th className="p-4 text-right">Valor</th><th className="p-4 text-center">Pagamento</th></tr></thead>
                                 <tbody className="divide-y divide-neutral-700 text-sm text-gray-300">
                                     {registrationsList.length > 0 ? (
-                                        // FILTRO APLICADO AQUI
                                         registrationsList
                                         .filter(reg => reg.pilot_name.toLowerCase().includes(regSearch.toLowerCase()) || (reg.pilot_number && reg.pilot_number.includes(regSearch)))
                                         .map(reg => (
@@ -580,38 +609,67 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* --- ABA PLANOS E LOTES --- */}
+        {/* --- ABA PLANOS E LOTES (LÓGICA NOVA: SELEÇÃO DE ETAPA) --- */}
         {activeTab === 'plans' && (
             <div className="animate-fade-in">
-                <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden shadow-2xl">
-                    <div className="p-6 border-b border-neutral-700 bg-neutral-900 flex justify-between items-center">
-                        <div><h2 className="text-2xl font-black italic uppercase text-white flex items-center gap-2"><Tag className="text-yellow-500" /> Gestão de Lotes e Pagamento</h2><p className="text-gray-500 text-sm mt-1">Edite o lote, os valores e a chave PIX.</p></div>
-                    </div>
-                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-neutral-700 pb-8 mb-6">
-                        <div><label className="text-xs text-yellow-500 font-bold uppercase">Nome do Lote Atual</label><input className="w-full bg-neutral-900 border border-yellow-600/50 rounded p-3 text-white font-bold text-lg outline-none focus:border-yellow-500 mt-2" placeholder="Ex: 1º Lote - Promocional" value={batchName} onChange={(e) => setBatchName(e.target.value)} /></div>
-                        <div><label className="text-xs text-green-500 font-bold uppercase flex items-center gap-2"><DollarSign size={14}/> Chave PIX para Recebimento</label><input className="w-full bg-neutral-900 border border-green-600/50 rounded p-3 text-white font-mono text-lg outline-none focus:border-green-500 mt-2" placeholder="Email, CPF ou Telefone" value={pixKey} onChange={(e) => setPixKey(e.target.value)} /></div>
-                    </div>
-                    <div className="px-6 pb-2"><h3 className="text-lg font-bold text-white mb-4">Tabela de Preços</h3></div>
-                    <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {localPlans.map(plan => (
-                            <div key={plan.id} className="bg-[#111] border border-gray-800 rounded-xl p-6 relative hover:border-yellow-600/50 transition-all">
-                                <div className="mb-4 flex justify-between items-start">
-                                    <div><h3 className="text-lg font-black text-white uppercase italic">{plan.name}</h3><p className="text-xs text-gray-500 mt-1">{plan.description}</p></div>
-                                    <div className="bg-neutral-900 px-2 py-1 rounded text-[10px] font-bold text-gray-400 border border-neutral-800">{plan.limit_cat === 99 ? 'Ilimitado' : `${plan.limit_cat} Cat.`}</div>
-                                </div>
-                                <div className="flex items-center gap-2 bg-neutral-900 p-3 rounded border border-neutral-700 focus-within:border-yellow-500 transition-colors"><span className="text-gray-400 text-sm font-bold">R$</span><input type="number" className="bg-transparent text-white font-black text-2xl w-full outline-none" value={plan.price} onChange={(e) => handleLocalPriceChange(plan.id, e.target.value)} /></div>
+                {!selectedStagePlan ? (
+                    <div className="bg-neutral-800 p-8 rounded-xl border border-neutral-700">
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Tag className="text-yellow-500"/> Selecione a Etapa para Editar Lote</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {stages.map(stage => (
+                                <button key={stage.id} onClick={() => setSelectedStagePlan(stage.id)} className="p-6 bg-neutral-900 border border-neutral-700 rounded-lg hover:border-yellow-500 text-left group transition-all">
+                                    <div className="text-yellow-500 text-xs font-bold uppercase mb-2">{new Date(stage.date + 'T12:00:00').toLocaleDateString('pt-BR')}</div>
+                                    <div className="text-lg font-bold text-gray-200 group-hover:text-white">{stage.name}</div>
+                                    <div className="text-xs text-gray-500 mt-2">Lote Atual: {stage.batch_name || 'Padrão'}</div>
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Área PIX GLOBAL (Visível aqui para facilitar) */}
+                        <div className="mt-8 pt-6 border-t border-neutral-700">
+                            <label className="text-xs text-green-500 font-bold uppercase flex items-center gap-2 mb-2"><DollarSign size={14}/> Chave PIX (Global)</label>
+                            <div className="flex gap-2">
+                                <input className="w-full max-w-md bg-neutral-900 border border-green-600/50 rounded p-3 text-white font-mono outline-none focus:border-green-500" placeholder="Email, CPF ou Telefone" value={pixKey} onChange={(e) => setPixKey(e.target.value)} />
+                                <button onClick={() => fetch(`http://localhost:3000/api/settings/pix_key`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ value: pixKey }) }).then(() => showMessage("PIX Salvo!", "success"))} className="bg-green-700 hover:bg-green-600 text-white px-4 rounded font-bold transition">Salvar PIX</button>
                             </div>
-                        ))}
+                        </div>
                     </div>
-                    <div className="p-6 bg-neutral-900 border-t border-neutral-700 flex justify-end items-center gap-4">
-                        <div className="text-xs text-gray-500 hidden md:block"><span className="text-yellow-500 font-bold">Atenção:</span> A alteração será aplicada imediatamente.</div>
-                        <button onClick={handleLaunchNewLot} disabled={loading} className="bg-yellow-600 hover:bg-yellow-500 text-white px-8 py-4 rounded-lg font-black uppercase tracking-widest shadow-lg hover:shadow-yellow-900/20 transition-all flex items-center gap-3 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Processando...' : 'Salvar Tudo'}{!loading && <Save size={20} strokeWidth={3} />}</button>
+                ) : (
+                    // TELA DE EDIÇÃO DE PREÇOS DA ETAPA
+                    <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden shadow-2xl">
+                        <div className="p-6 border-b border-neutral-700 bg-neutral-900 flex justify-between items-center">
+                            <div><h2 className="text-2xl font-black italic uppercase text-white flex items-center gap-2"><Tag className="text-yellow-500" /> Editando: {stages.find(s=>s.id===selectedStagePlan)?.name}</h2></div>
+                            <button onClick={() => setSelectedStagePlan(null)} className="text-gray-400 hover:text-white flex items-center gap-2 text-sm"><ArrowLeft size={16}/> Trocar Etapa</button>
+                        </div>
+                        
+                        <div className="p-6 pb-8 mb-6 border-b border-neutral-700">
+                            <label className="text-xs text-yellow-500 font-bold uppercase">Nome do Lote desta Etapa</label>
+                            <input className="w-full bg-neutral-900 border border-yellow-600/50 rounded p-3 text-white font-bold text-lg outline-none focus:border-yellow-500 mt-2" placeholder="Ex: 1º Lote - Promocional" value={batchName} onChange={(e) => setBatchName(e.target.value)} />
+                        </div>
+
+                        <div className="px-6 pb-2"><h3 className="text-lg font-bold text-white mb-4">Tabela de Preços (Exclusivo desta Etapa)</h3></div>
+                        <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {localPlans.map(plan => (
+                                <div key={plan.id} className="bg-[#111] border border-gray-800 rounded-xl p-6 relative hover:border-yellow-600/50 transition-all">
+                                    <div className="mb-4 flex justify-between items-start">
+                                        <div><h3 className="text-lg font-black text-white uppercase italic">{plan.name}</h3><p className="text-xs text-gray-500 mt-1">{plan.description}</p></div>
+                                        <div className="bg-neutral-900 px-2 py-1 rounded text-[10px] font-bold text-gray-400 border border-neutral-800">{plan.limit_cat === 99 ? 'Ilimitado' : `${plan.limit_cat} Cat.`}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-neutral-900 p-3 rounded border border-neutral-700 focus-within:border-yellow-500 transition-colors"><span className="text-gray-400 text-sm font-bold">R$</span><input type="number" className="bg-transparent text-white font-black text-2xl w-full outline-none" value={plan.price} onChange={(e) => handleLocalPriceChange(plan.id, e.target.value)} /></div>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <div className="p-6 bg-neutral-900 border-t border-neutral-700 flex justify-end items-center gap-4">
+                            <div className="text-xs text-gray-500 hidden md:block"><span className="text-yellow-500 font-bold">Atenção:</span> A alteração aplica somente a esta etapa.</div>
+                            <button onClick={handleSaveStagePrices} disabled={loading} className="bg-yellow-600 hover:bg-yellow-500 text-white px-8 py-4 rounded-lg font-black uppercase tracking-widest shadow-lg hover:shadow-yellow-900/20 transition-all flex items-center gap-3 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Salvando...' : 'Salvar Alterações'}{!loading && <Save size={20} strokeWidth={3} />}</button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         )}
 
-        {/* --- ABA PILOTOS (USUÁRIOS) --- */}
+        {/* --- ABA PILOTOS (USUÁRIOS) COM BUSCA --- */}
         {activeTab === 'users' && (
           <div className="animate-fade-in space-y-6">
              {editingUser && (
@@ -632,16 +690,15 @@ const AdminDashboard = () => {
                 <div className="p-6 border-b border-neutral-700 bg-neutral-900 flex justify-between items-center">
                    <h2 className="text-2xl font-black italic uppercase text-white flex items-center gap-2"><Users className="text-blue-500" /> Gestão de Pilotos</h2>
                    <div className="flex items-center gap-4">
-                       {/* NOVO: BUSCA DE PILOTO */}
                        <div className="relative hidden md:block">
-                            <Search className="absolute left-3 top-2.5 text-gray-500" size={16} />
-                            <input 
-                                type="text" 
-                                placeholder="Buscar Piloto..." 
-                                className="bg-neutral-800 border border-neutral-600 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:border-blue-500 outline-none w-64"
-                                value={userSearch}
-                                onChange={(e) => setUserSearch(e.target.value)}
-                            />
+                           <Search className="absolute left-3 top-2.5 text-gray-500" size={16} />
+                           <input 
+                               type="text" 
+                               placeholder="Buscar Piloto..." 
+                               className="bg-neutral-800 border border-neutral-600 rounded-full py-2 pl-10 pr-4 text-sm text-white focus:border-blue-500 outline-none w-64"
+                               value={userSearch}
+                               onChange={(e) => setUserSearch(e.target.value)}
+                           />
                        </div>
                        <div className="text-sm text-gray-500 font-bold bg-neutral-800 px-3 py-1 rounded-full border border-neutral-700">Total: {usersList.length}</div>
                    </div>
@@ -651,12 +708,11 @@ const AdminDashboard = () => {
                       <thead><tr className="bg-neutral-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-neutral-700"><th className="p-4">Piloto</th><th className="p-4 text-center">Nº Moto</th><th className="p-4 text-center text-blue-400">Chip ID</th><th className="p-4 hidden md:table-cell">CPF</th><th className="p-4 text-center">Função</th><th className="p-4 text-right">Ações</th></tr></thead>
                       <tbody className="divide-y divide-neutral-700 text-sm text-gray-300">
                          {usersList.length > 0 ? (
-                             // FILTRO APLICADO AQUI
                              usersList
-                             .filter(user => 
-                                user.name.toLowerCase().includes(userSearch.toLowerCase()) || 
-                                user.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-                                (user.bike_number && user.bike_number.includes(userSearch))
+                             .filter(u => 
+                                u.name.toLowerCase().includes(userSearch.toLowerCase()) || 
+                                u.email.toLowerCase().includes(userSearch.toLowerCase()) || 
+                                (u.bike_number && u.bike_number.includes(userSearch))
                              )
                              .map((user) => (
                                 <tr key={user.id} className={`hover:bg-neutral-700/30 transition group ${editingUser === user.id ? 'bg-yellow-900/10' : ''}`}>
